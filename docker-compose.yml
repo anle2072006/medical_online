@@ -1,0 +1,48 @@
+# Chay toan bo he thong: docker compose up --build   (mo http://localhost:8080)
+# Co so du lieu: MongoDB. Moi service dung database RIENG (identity_db, scheduling_db, billing_db, records_db, tele_db, notify_db).
+# Muon tach hoan toan thanh nhieu may chu Mongo, chi can dat MONGO_URL_<SERVICE> rieng cho tung service.
+x-svc: &svc
+  build: .
+  image: sina-clinic
+  restart: unless-stopped
+  depends_on:
+    rabbitmq: { condition: service_healthy }
+    mongo: { condition: service_healthy }
+  environment: &env
+    RABBITMQ_URL: amqp://rabbitmq
+    MONGO_URL: mongodb://mongo:27017
+    JWT_SECRET: ${JWT_SECRET:-doi-khoa-bi-mat-nay}
+    INTERNAL_KEY: ${INTERNAL_KEY:-doi-khoa-noi-bo}
+    WEBHOOK_SECRET: ${WEBHOOK_SECRET:-doi-khoa-webhook}
+    DEMO_MODE: ${DEMO_MODE:-true}
+    TZ: Asia/Ho_Chi_Minh
+    IDENTITY_URL: http://identity:3001
+    SCHEDULING_URL: http://scheduling:3002
+    BILLING_URL: http://billing:3003
+    RECORDS_URL: http://records:3004
+    TELE_URL: http://tele:3005
+    NOTIFY_URL: http://notify:3006
+    MOCK_URL: http://mock-externals:4000
+
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    ports: ["15673:15672"]   # giao dien quan tri RabbitMQ: guest / guest
+    healthcheck: { test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"], interval: 10s, timeout: 10s, retries: 12 }
+
+  mongo:
+    image: mongo:7
+    volumes: ["mongo-data:/data/db"]
+    ports: ["27030:27017"]   # tuy chon: xem du lieu bang MongoDB Compass
+    healthcheck: { test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"], interval: 10s, timeout: 10s, retries: 12 }
+
+  mock-externals: { <<: *svc, command: ["node", "services/mock-externals/index.js"] }
+  identity:   { <<: *svc, command: ["node", "services/identity/index.js"],   environment: { <<: *env, LICENSE_CHECK_MS: "60000" } }
+  scheduling: { <<: *svc, command: ["node", "services/scheduling/index.js"] }
+  billing:    { <<: *svc, command: ["node", "services/billing/index.js"] }
+  records:    { <<: *svc, command: ["node", "services/records/index.js"] }
+  tele:       { <<: *svc, command: ["node", "services/tele/index.js"] }
+  notify:     { <<: *svc, command: ["node", "services/notify/index.js"] }
+  gateway:    { <<: *svc, command: ["node", "services/gateway/index.js"], ports: ["8080:8080"] }
+
+volumes: { mongo-data: {} }

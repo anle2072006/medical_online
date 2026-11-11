@@ -1,0 +1,20 @@
+{
+  "name": "clinic-soa",
+  "version": "1.0.0",
+  "description": "SINA Clinic - nen tang kham benh tu xa theo kien truc huong dich vu (SOA), MongoDB + RabbitMQ",
+  "private": true,
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "node scripts/run-all.js",
+    "test": "node tests/e2e.js"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.4",
+    "bcryptjs": "^2.4.3",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongodb": "^6.22.0"
+  }
+}
