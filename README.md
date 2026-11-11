@@ -1,6 +1,6 @@
 # SINA Clinic: nền tảng khám bệnh từ xa tự động (SOA)
 
-Đồ án cuối kì môn Kiến trúc hướng dịch vụ. Hệ thống **không có admin**: duyệt ca, xác thực bác sĩ, tạm khóa, hoàn tiền đều do các service tự quyết định bằng luật và sự kiện. Người dùng chỉ gồm **bệnh nhân** và **bác sĩ**.
+Đồ án cuối kì môn Kiến trúc hướng dịch vụ.
 
 ## Kiến trúc
 
