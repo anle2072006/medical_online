@@ -31,7 +31,7 @@ services:
   mongo:
     image: mongo:7
     volumes: ["mongo-data:/data/db"]
-    ports: ["27017:27017"]  
+    ports: ["27030:27017"]  
     healthcheck: { test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"], interval: 10s, timeout: 10s, retries: 12 }
 
   mock-externals: { <<: *svc, command: ["node", "services/mock-externals/index.js"] }
