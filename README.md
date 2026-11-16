@@ -36,6 +36,15 @@ npm run dev          # chạy 8 tiến trình, mở http://localhost:8080
 npm test             # 54 kiểm thử end-to-end qua gateway (chạy khi hệ thống đang chạy)
 ```
 
+## Gửi email thật
+
+Mặc định email chỉ được **ghi log** (giả lập) để chạy được ngay không cần cấu hình. Muốn email về hộp thư thật:
+
+1. Sao chép `.env.example` thành `.env` (cùng thư mục với `docker-compose.yml`) rồi điền `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`. Với Gmail, bật xác minh 2 bước rồi tạo **Mật khẩu ứng dụng** tại https://myaccount.google.com/apppasswords (không dùng mật khẩu Gmail thường). Có thể dùng Mailtrap để thử mà không gửi cho người thật.
+2. Chạy `docker compose up -d notify`, xem `docker compose logs notify` phải có dòng `SMTP san sang`.
+3. Email gửi tới **địa chỉ người dùng nhập khi đăng ký**. Các email có: chào mừng, xác nhận lịch, biên lai thanh toán VNPay, hủy lịch, hoàn tiền, đơn thuốc, nhắc lịch trước 24 giờ và 1 giờ. Gửi lỗi thì thử lại 3 lần rồi đánh dấu lỗi (hiện trong mục Thông báo).
+4. Không đưa file `.env` lên Git.
+
 ## Thử nhanh (demo)
 
 `DEMO_MODE=true` (mặc định) cho phép đặt lịch sát giờ và vào phòng khám bất kỳ lúc nào để demo trọn luồng trong vài phút. Đặt `DEMO_MODE=false` để áp dụng luật thật (đặt trước giờ khám ít nhất 2 giờ, phòng mở trước 10 phút). Các luật duyệt ca luôn áp dụng đầy đủ ở cả hai chế độ, kể cả luật đăng ký trước 24 giờ.

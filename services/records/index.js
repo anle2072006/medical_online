@@ -1,6 +1,4 @@
 'use strict';
-// Medical Record (records_db, MongoDB): benh an (FHIR rut gon), don thuoc dien tu, nhat ky truy cap.
-// Don thuoc chi la don dien tu co ma: benh nhan tu mang don den co so ban thuoc gan nhat de nhan thuoc.
 const C = require('../../common');
 const { uid, nowIso, HttpError, wrap, auth, log } = C;
 

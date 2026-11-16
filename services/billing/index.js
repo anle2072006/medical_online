@@ -1,7 +1,7 @@
 'use strict';
 // Billing (billing_db, MongoDB): hoa don, thanh toan VNPay sandbox, webhook idempotent, hoan tien.
 const C = require('../../common');
-const { CONFIG, uid, nowIso, sign, HttpError, wrap, auth, callJson, log } = C;
+const { CONFIG, uid, nowIso, sign, HttpError, wrap, auth, internalOnly, callJson, log } = C;
 
 let bus, invoices, payments, refunds, processedIpn;
 
@@ -54,7 +54,17 @@ async function main() {
     res.json({ ok: true });
   }));
 
-  // ----- Su kien -----
+    // Cong thanh toan xin gui OTP: Billing xac dinh benh nhan cua giao dich roi phat su kien, Notification gui email.
+  app.post('/internal/otp', internalOnly, wrap(async (req, res) => {
+    const { txnRef, otp } = req.body || {};
+    const pay = await payments.get({ txn_ref: txnRef });
+    const inv = pay && await invoices.get({ id: pay.invoice_id });
+    if (!inv) throw new HttpError(404, 'TXN_NOT_FOUND');
+    bus.publish('payment.otp_issued', { patientId: inv.patient_id, appointmentId: inv.appointment_id, amount: inv.amount, txnRef, otp });
+    res.json({ ok: true });
+  }));
+
+  //Su kien
   bus.on('appointment.requested', async (d) => {
     await invoices.insertIgnore({ id: uid(), appointment_id: d.appointmentId, patient_id: d.patientId, amount: d.amount, status: 'PENDING', attempts: 0, created_at: nowIso() });
     const inv = await invoices.get({ appointment_id: d.appointmentId });

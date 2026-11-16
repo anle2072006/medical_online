@@ -8,7 +8,7 @@ let bus, doctorsCache, shifts, leaves, slots, appts, apptLog;
 const SLOT_OPTIONS = [15, 20, 30, 45];
 const ACTIVE_APPT = ['pending', 'confirmed', 'in_progress', 'failed', 'rescheduled'];
 
-// ---------- FSM lich hen: chuyen trang thai nguyen tu, tra ve ban ghi truoc khi doi (null neu khong hop le) ----------
+//FSM lich hen: chuyen trang thai nguyen tu, tra ve ban ghi truoc khi doi (null neu khong hop le)
 async function transition(id, from, to, reason, patch = {}, inc) {
   const upd = { $set: { status: to, ...patch } }; if (inc) upd.$inc = inc;
   const before = await appts.claim({ id, status: { $in: from } }, upd);
@@ -23,7 +23,7 @@ const refundPercentFor = (a) => { const h = (localDate(a.date, a.start) - Date.n
 const releaseSlot = (slotId, to = 'AVAILABLE', reason = null) => slots.update({ id: slotId }, { $set: { status: to, block_reason: reason, hold_appt: null }, $inc: { version: 1 } });
 const upcomingFilter = (today, nowT) => ({ $or: [{ date: { $gt: today } }, { date: today, start: { $gt: nowT } }] });
 
-// ---------- Sinh slot ----------
+// Sinh slot 
 const approvedLeaves = (doctorId) => leaves.all({ doctor_id: doctorId, status: { $in: ['APPROVED', 'ACTIVE'] } });
 async function generateForShift(s) {
   const doc = await doctorsCache.get({ id: s.doctor_id });
@@ -43,9 +43,7 @@ async function generateForShift(s) {
 }
 const generateAll = async () => { for (const s of await shifts.all({ status: 'APPROVED' })) await generateForShift(s); };
 
-// ---------- Luat tu duyet ca (dung 5 luat, khong co admin) ----------
-// Thu tu kiem tra: DOCTOR_NOT_VERIFIED, OUT_OF_HOURS, SHIFT_OVERLAP, OVER_LIMIT, TOO_LATE.
-function firstOccurrence(b) { // lan dien ra dau tien cua ca (ngay >= startDate, dung thu trong tuan)
+function firstOccurrence(b) {
   const d = new Date(`${b.startDate}T00:00:00`);
   while (d.getDay() !== b.weekday) d.setDate(d.getDate() + 1);
   return localDate(ymd(d), b.startTime);
@@ -67,7 +65,7 @@ const REJECT_TEXT = {
   TOO_LATE: 'Cần đăng ký ca trước ít nhất 24 giờ so với lần diễn ra đầu tiên.',
 };
 
-// ---------- Huy lich (dung chung cho benh nhan, bac si nghi, bac si bi khoa) ----------
+//Huy lich (dung chung cho benh nhan, bac si nghi, bac si bi khoa
 async function cancelAppointment(id, { by, reason, refundPercent, slotAfter = 'AVAILABLE', slotReason = null }) {
   const a = await appts.get({ id });
   if (!a) return null;
@@ -287,7 +285,6 @@ async function main() {
   bus.on('refund.completed', async (d) => { await transition(d.appointmentId, ['refunding'], 'refunded', 'REFUND_COMPLETED'); });
   await bus.start();
 
-  // ===== Tac vu nen =====
   setInterval(async () => { // het han giu cho
     try { for (const a of await appts.all({ status: { $in: ['pending', 'failed'] }, expires_at: { $lt: nowIso() }, released: { $ne: true } })) await failFinal(a, 'HOLD_EXPIRED'); } catch (e) { log('scheduling', 'job het han loi:', e.message); }
   }, 5000);

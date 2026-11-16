@@ -8,20 +8,36 @@ const EMAIL_FAIL = Number(process.env.EMAIL_FAIL_RATE || 0);
 const money = (n) => Number(n).toLocaleString('vi-VN') + ' đ';
 const REASON = { LICENSE_INVALID: 'số giấy phép không hợp lệ', LICENSE_EXPIRED: 'giấy phép đã hết hạn', LICENSE_REVOKED: 'giấy phép đã bị thu hồi', ABSENCE: 'vắng mặt 3 buổi hẹn trong 30 ngày', CLOSED_BY_DOCTOR: 'bác sĩ đã đóng tài khoản' };
 
-async function sendEmail(n) { // gia lap SMTP; loi thi retry toi da 3 lan roi bo
+//Gui email: SMTP that neu co SMTP_HOST, nguoc lai gia lap (chi ghi log) 
+const SMTP = { host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT || 587), secure: process.env.SMTP_SECURE === 'true', user: process.env.SMTP_USER, pass: process.env.SMTP_PASS };
+const MAIL_FROM = process.env.SMTP_FROM || `SINA Clinic <${SMTP.user || 'no-reply@sina-clinic.local'}>`;
+let transporter = null;
+if (SMTP.host) {
+  transporter = require('nodemailer').createTransport({ host: SMTP.host, port: SMTP.port, secure: SMTP.secure, auth: SMTP.user ? { user: SMTP.user, pass: SMTP.pass } : undefined, connectionTimeout: 10000, greetingTimeout: 10000 });
+  transporter.verify().then(() => log('notify', `SMTP san sang: ${SMTP.host}:${SMTP.port}`)).catch((e) => log('notify', `CANH BAO: khong ket noi duoc SMTP (${e.message}). Email se gui loi va thu lai.`));
+} else log('notify', 'Chua cau hinh SMTP_HOST: email chi duoc ghi log (gia lap).');
+const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const emailHtml = (name, title, body) => `<!doctype html><html><body style="margin:0;background:#e8f5f6;font-family:Arial,Helvetica,sans-serif;color:#00404f"><div style="max-width:560px;margin:24px auto;background:#fff;border-radius:16px;overflow:hidden"><div style="background:#0096a8;color:#fff;padding:18px 24px;font-size:20px;font-weight:bold">SINA Clinic</div><div style="padding:24px"><p style="margin:0 0 6px;color:#5b8f95">Xin chào ${esc(name)},</p><h2 style="margin:0 0 12px;font-size:20px">${esc(title)}</h2><p style="margin:0;line-height:1.6;font-size:15px">${esc(body)}</p></div><div style="background:#eef9fb;color:#5b8f95;padding:14px 24px;font-size:12px">Email tự động từ hệ thống SINA Clinic, vui lòng không trả lời thư này.</div></div></body></html>`;
+
+async function deliver(u, n) {
+  if (!transporter) { if (Math.random() < EMAIL_FAIL) throw new Error('mo phong loi SMTP'); log('notify', `EMAIL (gia lap) -> ${u.email}: ${n.title}`); return; }
+  await transporter.sendMail({ from: MAIL_FROM, to: u.email, subject: n.title, text: n.body, html: emailHtml(u.full_name, n.title, n.body) });
+  log('notify', `EMAIL -> ${u.email}: ${n.title}`);
+}
+async function sendEmail(n) { // retry toi da 3 lan roi danh dau FAILED
   const u = await users.get({ id: n.user_id });
   if (!u) return notifications.set({ id: n.id }, { status: 'SKIPPED' });
   for (let i = 1; i <= 3; i++) {
-    if (Math.random() >= EMAIL_FAIL) { await notifications.set({ id: n.id }, { status: 'SENT', retry_count: i - 1 }); log('notify', `EMAIL -> ${u.email}: ${n.title}`); return; }
-    await notifications.set({ id: n.id }, { retry_count: i }); await sleep(300 * i);
+    try { await deliver(u, n); await notifications.set({ id: n.id }, { status: 'SENT', retry_count: i - 1 }); return; }
+    catch (e) { log('notify', `gui email loi (lan ${i}): ${e.message}`); await notifications.set({ id: n.id }, { retry_count: i }); await sleep(transporter ? 1500 * i : 300 * i); }
   }
   await notifications.set({ id: n.id }, { status: 'FAILED' });
 }
-async function push(userId, type, title, body) {
+async function push(userId, type, title, body, { inApp = true } = {}) {
   if (!userId) return;
-  const id = uid();
-  await notifications.insert({ id, user_id: userId, event_type: type, title, body, channel: 'email', status: 'PENDING', retry_count: 0, read: false, created_at: nowIso() });
-  sendEmail({ id, user_id: userId, title }).catch(() => {});
+  const id = uid(); 
+  await notifications.insert({ id, user_id: userId, event_type: type, title, body, channel: 'email', status: 'PENDING', retry_count: 0, read: false, inapp: inApp, created_at: nowIso()});
+  sendEmail({ id, user_id: userId, title, body }).catch(() => {});
 }
 const when = (d) => `${d.start} ngày ${d.date.split('-').reverse().join('/')}`;
 
@@ -62,6 +78,8 @@ async function main() {
       if (d.cancelledBy === 'PATIENT') await push(d.doctorId, 'appointment.cancelled', 'Bệnh nhân hủy lịch', `${d.patientName} đã hủy lịch lúc ${when(d)}.`);
     }
   });
+  on('payment.completed', (d) => push(d.patientId, 'payment.completed', 'Biên lai thanh toán', `Chúng tôi đã nhận ${money(d.amount)} cho lịch khám của bạn qua VNPay. Mã giao dịch: ${d.txnRef}. Lịch khám sẽ được xác nhận ngay sau đó.`));
+  on('payment.otp_issued', (d) => push(d.patientId, 'payment.otp', 'Mã OTP thanh toán VNPay', `Mã OTP của bạn là ${d.otp}. Mã có hiệu lực 5 phút và dùng để xác nhận thanh toán ${money(d.amount)} cho lịch khám. Tuyệt đối không chia sẻ mã này cho bất kỳ ai.`, { inApp: false }));
   on('payment.failed', (d) => push(d.patientId, 'payment.failed', 'Thanh toán chưa thành công', 'Bạn có thể thử thanh toán lại trong thời gian giữ chỗ.'));
   on('appointment.failed', (d) => push(d.patientId, 'appointment.failed', 'Giữ chỗ đã hết hạn', 'Khung giờ đã được trả lại. Hãy đặt lại nếu bạn vẫn muốn khám.'));
   on('refund.completed', (d) => d.amount > 0 && push(d.patientId, 'refund.completed', 'Đã hoàn tiền', `Hoàn ${money(d.amount)} (${d.percent}%) về phương thức thanh toán của bạn.`));
@@ -72,8 +90,8 @@ async function main() {
   await bus.start();
 
   app.get('/notifications/mine', auth(), wrap(async (req, res) => {
-    const items = await notifications.all({ user_id: req.user.id }, { sort: { created_at: -1 }, limit: 50 });
-    res.json({ unread: await notifications.count({ user_id: req.user.id, read: false }), items: items.map((n) => ({ id: n.id, type: n.event_type, title: n.title, body: n.body, status: n.status, retryCount: n.retry_count, read: n.read, createdAt: n.created_at })) });
+    const items = await notifications.all({ user_id: req.user.id, inapp: { $ne: false } }, { sort: { created_at: -1 }, limit: 50 });
+    res.json({ unread: await notifications.count({ user_id: req.user.id, read: false, inapp: { $ne: false } }), items: items.map((n) => ({ id: n.id, type: n.event_type, title: n.title, body: n.body, status: n.status, retryCount: n.retry_count, read: n.read, createdAt: n.created_at })) });
   }));
   app.post('/notifications/read-all', auth(), wrap(async (req, res) => { await notifications.updateMany({ user_id: req.user.id }, { $set: { read: true } }); res.json({ ok: true }); }));
 

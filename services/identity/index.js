@@ -39,7 +39,7 @@ async function verifyLoop(doctorId, attempt = 0) {
   }
 }
 
-// ----- Kiem tra dinh ky giay phep & het han khoa -----
+// Kiem tra dinh ky giay phep & het han khoa
 async function periodicCheck() {
   for (const d of await doctors.all({ status: { $in: ['active', 'suspended', 'on_leave'] } })) {
     if (d.status === 'suspended' && d.reason === 'ABSENCE') {
