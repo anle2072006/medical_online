@@ -20,7 +20,7 @@ const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const emailHtml = (name, title, body) => `<!doctype html><html><body style="margin:0;background:#e8f5f6;font-family:Arial,Helvetica,sans-serif;color:#00404f"><div style="max-width:560px;margin:24px auto;background:#fff;border-radius:16px;overflow:hidden"><div style="background:#0096a8;color:#fff;padding:18px 24px;font-size:20px;font-weight:bold">SINA Clinic</div><div style="padding:24px"><p style="margin:0 0 6px;color:#5b8f95">Xin chào ${esc(name)},</p><h2 style="margin:0 0 12px;font-size:20px">${esc(title)}</h2><p style="margin:0;line-height:1.6;font-size:15px">${esc(body)}</p></div><div style="background:#eef9fb;color:#5b8f95;padding:14px 24px;font-size:12px">Email tự động từ hệ thống SINA Clinic, vui lòng không trả lời thư này.</div></div></body></html>`;
 
 async function deliver(u, n) {
-  if (!transporter) { if (Math.random() < EMAIL_FAIL) throw new Error('mo phong loi SMTP'); log('notify', `EMAIL (gia lap) -> ${u.email}: ${n.title}`); return; }
+  if (!transporter) { if (Math.random() < EMAIL_FAIL) throw new Error('mo phong loi SMTP'); log('notify', `EMAIL (gia lap) -> ${u.email}: ${n.title} | ${n.body}`); return; }
   await transporter.sendMail({ from: MAIL_FROM, to: u.email, subject: n.title, text: n.body, html: emailHtml(u.full_name, n.title, n.body) });
   log('notify', `EMAIL -> ${u.email}: ${n.title}`);
 }
