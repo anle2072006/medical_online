@@ -91,6 +91,7 @@ async function main() {
 
   app.post('/login', wrap(async (req, res) => {
     const { email = '', password = '' } = req.body || {};
+    if (typeof email !== 'string' || typeof password !== 'string') throw new HttpError(400, 'INVALID_FIELD', 'Email hoặc mật khẩu không hợp lệ.');
     const u = await users.get({ email: email.toLowerCase() });
     if (!u || !bcrypt.compareSync(password, u.password_hash)) throw new HttpError(401, 'BAD_CREDENTIALS', 'Email hoặc mật khẩu chưa đúng.');
     if (u.role === 'doctor' && (await doctors.get({ user_id: u.id })).status === 'deactivated') throw new HttpError(403, 'ACCOUNT_CLOSED', 'Tài khoản bác sĩ đã đóng.');

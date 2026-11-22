@@ -26,6 +26,14 @@ const CONFIG = {
   },
 };
 
+// Khoa bi mat: o che do production (Docker) bat buoc phai dat khoa rieng, du dai, khong dung gia tri mac dinh cong khai trong repo.
+const WEAK = ['', 'dev-secret-change-me', 'dev-internal-key', 'dev-webhook-secret', 'doi-khoa-bi-mat-nay', 'doi-khoa-noi-bo', 'doi-khoa-webhook', 'changeme'];
+if (env.NODE_ENV === 'production') {
+  for (const k of ['JWT_SECRET', 'INTERNAL_KEY', 'WEBHOOK_SECRET']) {
+    if (WEAK.includes(env[k] || '') || (env[k] || '').length < 16) { console.error(`[FATAL] ${k} chua duoc dat hoac qua yeu (can it nhat 16 ky tu ngau nhien). Dat trong file .env roi chay lai.`); process.exit(1); }
+  }
+}
+
 const uid = () => crypto.randomUUID();
 const nowIso = () => new Date().toISOString();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -40,6 +48,13 @@ const sign = (text) => crypto.createHmac('sha256', CONFIG.hookSecret).update(tex
 class HttpError extends Error {
   constructor(status, code, message) { super(message || code); this.status = status; this.code = code; }
 }
+
+// Kiem tra kieu du lieu tu body: chan NoSQL operator injection (vi du {"$ne": null}) va chuoi qua dai.
+const str = (v, name, { min = 0, max = 200 } = {}) => {
+  if (typeof v !== 'string' || v.length < min || v.length > max) throw new HttpError(400, 'INVALID_FIELD', `Trường "${name}" không hợp lệ.`);
+  return v;
+};
+
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 function log(service, ...a) { console.log(`[${service}]`, ...a); }
@@ -165,4 +180,4 @@ function finish(app, service, port) {
   app.listen(port, () => log(service, `dang chay o cong ${port}`));
 }
 
-module.exports = { CONFIG, uid, nowIso, sleep, pad, ymd, addDays, toMin, fromMin, localDate, sign, HttpError, wrap, log, openDb, connectBus, signToken, auth, internalOnly, callJson, createApp, finish, express };
+module.exports = { CONFIG,str, uid, nowIso, sleep, pad, ymd, addDays, toMin, fromMin, localDate, sign, HttpError, wrap, log, openDb, connectBus, signToken, auth, internalOnly, callJson, createApp, finish, express };

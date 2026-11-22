@@ -8,6 +8,13 @@ const ROUTES = { identity: CONFIG.urls.identity, scheduling: CONFIG.urls.schedul
 const PUBLIC = [['POST', '/api/identity/register'], ['POST', '/api/identity/login'], ['GET', '/api/identity/specialties']];
 const hits = new Map();
 
+// Duong dan noi bo chi cac service goi nhau, khong bao gio duoc lo ra ngoai (khong phan biet hoa thuong).
+const BLOCKED = /(^|\/)(internal|webhooks)(\/|$)/i;
+// He thong ben ngoai gia lap: chi mo dung cac trang ma trinh duyet can.
+const EXT_OK = [/^\/vnpay\/(pay|otp|complete)\/[\w-]+$/];
+if (process.env.NODE_ENV !== 'production') EXT_OK.push(/^\/vnpay\/_test\/otp\/[\w-]+$/);
+if (process.env.ALLOW_MOCK_ADMIN === 'true') EXT_OK.push(/^\/verify\/revoke\/[\w-]+$/);
+
 const app = C.express();
 app.use((req, res, next) => { // gioi han 300 yeu cau moi phut moi dia chi
   const k = req.ip; const now = Date.now(); const h = (hits.get(k) || []).filter((t) => now - t < 60000);
@@ -35,14 +42,18 @@ app.get('/api/health', wrap(async (req, res) => {
   res.json({ gateway: 'up', services: out });
 }));
 
-// He thong ben ngoai gia lap (trang thanh toan VNPay): khong can dang nhap.
-app.all('/ext/*', (req, res) => forward(req, res, CONFIG.urls.mock, req.originalUrl.replace('/ext', '')));
+app.all('/ext/*', (req, res) => {
+  const rest = req.originalUrl.replace('/ext', '');
+  if (!EXT_OK.some((re) => re.test(rest.split('?')[0]))) return res.status(404).json({ error: 'NOT_FOUND' });
+  forward(req, res, CONFIG.urls.mock, rest);
+});
 
 app.all('/api/:service/*', (req, res, next) => {
   const base = ROUTES[req.params.service];
   if (!base) return res.status(404).json({ error: 'UNKNOWN_SERVICE' });
   const rest = req.originalUrl.replace(`/api/${req.params.service}`, '');
-  if (rest.startsWith('/internal') || rest.startsWith('/webhooks')) return res.status(404).json({ error: 'NOT_FOUND' }); // khong lo ra ngoai
+  let decoded; try { decoded = decodeURIComponent(rest.split('?')[0]).replace(/\/+/g, '/'); } catch { return res.status(400).json({ error: 'BAD_PATH' }); }
+  if (BLOCKED.test(decoded)) return res.status(404).json({ error: 'NOT_FOUND' }); // khong lo ra ngoai // khong lo ra ngoai
   const isPublic = PUBLIC.some(([m, p]) => m === req.method && req.path === p);
   if (isPublic) return forward(req, res, base, rest);
   auth()(req, res, () => forward(req, res, base, rest)); // kiem tra JWT o gateway, moi service kiem tra lai
@@ -50,3 +61,4 @@ app.all('/api/:service/*', (req, res, next) => {
 
 app.use(C.express.static(path.join(__dirname, '..', '..', 'frontend')));
 C.finish(app, 'gateway', Number(process.env.PORT || 8080));
+

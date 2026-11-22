@@ -167,7 +167,7 @@ async function main() {
 
   // ----- Dat lich -----
   app.post('/appointments', auth('patient'), wrap(async (req, res) => {
-    const slot = await slots.get({ id: (req.body || {}).slotId });
+    const slot = await slots.get({ id: C.str((req.body || {}).slotId, 'slotId', { min: 1, max: 64 }) });
     if (!slot) throw new HttpError(404, 'SLOT_NOT_FOUND', 'Không tìm thấy khung giờ này.');
     const startAt = localDate(slot.date, slot.start);
     if (startAt - Date.now() < CONFIG.leadMinutes * 6e4 || startAt < Date.now()) throw new HttpError(409, 'TOO_SOON', 'Khung giờ này đã quá gần. Hãy chọn khung giờ khác.');
@@ -219,7 +219,7 @@ async function main() {
     const a = await appts.get({ id: req.params.id, patient_id: req.user.id });
     if (!a) throw new HttpError(404, 'NOT_FOUND');
     if (a.status !== 'confirmed') throw new HttpError(409, 'CANNOT_RESCHEDULE', 'Chỉ đổi được lịch đã xác nhận.');
-    const ns = await slots.get({ id: (req.body || {}).slotId });
+    const ns = await slots.get({ id: C.str((req.body || {}).slotId, 'slotId', { min: 1, max: 64 }) });
     if (!ns || ns.doctor_id !== a.doctor_id) throw new HttpError(404, 'SLOT_NOT_FOUND', 'Khung giờ mới phải thuộc cùng bác sĩ.');
     const at = localDate(ns.date, ns.start);
     if (at - Date.now() < CONFIG.leadMinutes * 6e4 || at < Date.now()) throw new HttpError(409, 'TOO_SOON', 'Khung giờ mới đã quá gần.');

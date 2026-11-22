@@ -9,9 +9,9 @@ x-svc: &svc
   environment: &env
     RABBITMQ_URL: amqp://rabbitmq
     MONGO_URL: mongodb://mongo:27017
-    JWT_SECRET: ${JWT_SECRET:-doi-khoa-bi-mat-nay}
-    INTERNAL_KEY: ${INTERNAL_KEY:-doi-khoa-noi-bo}
-    WEBHOOK_SECRET: ${WEBHOOK_SECRET:-doi-khoa-webhook}
+    JWT_SECRET: ${JWT_SECRET:?Hay dat JWT_SECRET trong file .env}
+    INTERNAL_KEY: ${INTERNAL_KEY:?Hay dat INTERNAL_KEY trong file .env}
+    WEBHOOK_SECRET: ${WEBHOOK_SECRET:?Hay dat WEBHOOK_SECRET trong file .env}
     DEMO_MODE: ${DEMO_MODE:-true}
     TZ: Asia/Ho_Chi_Minh
     IDENTITY_URL: http://identity:3001
