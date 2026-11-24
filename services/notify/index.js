@@ -53,6 +53,10 @@ async function main() {
   const on = (t, fn) => bus.on(t, async (d) => fn(d));
 
   on('user.registered', async (d) => { await users.upsert({ id: d.userId }, { email: d.email, full_name: d.fullName }); if (d.role === 'patient') await push(d.userId, 'user.registered', 'Chào mừng đến SINA Clinic', 'Tài khoản của bạn đã sẵn sàng. Hãy tìm bác sĩ và đặt lịch khám đầu tiên.'); });
+  on('user.otp_issued', async (d) => { // OTP xac minh email: khong co trong thong bao trong ung dung, chi gui email
+    await users.upsert({ id: d.userId }, { email: d.email, full_name: d.fullName });
+    await push(d.userId, 'user.otp', 'Mã xác minh email SINA Clinic', `Mã OTP của bạn là ${d.otp}. Mã có hiệu lực 10 phút. Tuyệt đối không chia sẻ mã này cho bất kỳ ai.`, { inApp: false });
+  });
   on('doctor.registered', (d) => push(d.doctorId, 'doctor.registered', 'Đang xác thực giấy phép', 'Hồ sơ của bạn đang được xác thực. Bạn sẽ nhận thông báo ngay khi có kết quả.'));
   on('doctor.verified', (d) => push(d.doctorId, 'doctor.verified', 'Hồ sơ đã được xác thực', 'Bạn có thể đăng ký ca làm việc để bệnh nhân bắt đầu đặt lịch.'));
   on('doctor.rejected', (d) => push(d.doctorId, 'doctor.rejected', 'Hồ sơ chưa được xác thực', `Lý do: ${REASON[d.reason] || d.reason}. Bạn có thể nộp lại tối đa 3 lần.`));
@@ -90,7 +94,9 @@ async function main() {
   await bus.start();
 
   app.get('/notifications/mine', auth(), wrap(async (req, res) => {
-    const items = await notifications.all({ user_id: req.user.id, inapp: { $ne: false } }, { sort: { created_at: -1 }, limit: 50 });
+    const pg = C.pageOf(req, 50); const f = { user_id: req.user.id, inapp: { $ne: false } };
+    C.pageHeaders(res, pg, await notifications.count(f));
+    const items = await notifications.all(f, { sort: { created_at: -1 }, skip: pg.skip, limit: pg.limit });
     res.json({ unread: await notifications.count({ user_id: req.user.id, read: false, inapp: { $ne: false } }), items: items.map((n) => ({ id: n.id, type: n.event_type, title: n.title, body: n.body, status: n.status, retryCount: n.retry_count, read: n.read, createdAt: n.created_at })) });
   }));
   app.post('/notifications/read-all', auth(), wrap(async (req, res) => { await notifications.updateMany({ user_id: req.user.id }, { $set: { read: true } }); res.json({ ok: true }); }));
