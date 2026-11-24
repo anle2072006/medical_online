@@ -1,0 +1,99 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SINA Clinic - Teleconsultation Service",
+    "version": "1.0.0",
+    "description": "Phong Jitsi theo lich hen, kiem soat nguoi vao, phat hien vang mat. Moi loi tra ve dang { error: MA_LOI, message }."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "paths": {
+    "/api/tele/sessions/{appointmentId}": {
+      "get": {
+        "summary": "Trang thai phong kham (ai da vao)",
+        "tags": [
+          "Teleconsultation Service"
+        ],
+        "operationId": "get_tele__sessions_appointmentId",
+        "parameters": [
+          {
+            "name": "appointmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          },
+          "404": {
+            "description": "NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: moi nguoi dung da dang nhap."
+      }
+    },
+    "/api/tele/sessions/{appointmentId}/join": {
+      "post": {
+        "summary": "Vao phong, nhan duong dan Jitsi; khi ca hai da vao lich chuyen in_progress",
+        "tags": [
+          "Teleconsultation Service"
+        ],
+        "operationId": "post_tele__sessions_appointmentId_join",
+        "parameters": [
+          {
+            "name": "appointmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          },
+          "403": {
+            "description": "NOT_PARTICIPANT"
+          },
+          "409": {
+            "description": "SESSION_CLOSED, TOO_EARLY"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: moi nguoi dung da dang nhap."
+      }
+    }
+  }
+}

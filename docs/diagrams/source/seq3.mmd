@@ -1,0 +1,37 @@
+sequenceDiagram
+  participant P as Bệnh nhân
+  participant GW as Gateway
+  participant SC as Scheduling
+  participant MQ as RabbitMQ
+  participant BL as Billing
+  participant VP as VNPay (giả lập)
+  participant NT as Notify
+  participant TL as Tele
+  participant RC as Records
+  P->>GW: POST /appointments (slotId)
+  GW->>SC: chuyển tiếp
+  SC->>SC: cập nhật có điều kiện: slot AVAILABLE + đúng version → HELD
+  alt slot đã bị người khác giữ
+    SC-->>P: 409 SLOT_TAKEN
+  else giữ chỗ thành công (15 phút)
+    SC-)MQ: appointment.requested
+    SC-->>P: 201 lịch pending
+    MQ-)BL: appointment.requested
+    BL->>VP: tạo giao dịch (txnRef, số tiền)
+    VP-->>BL: payUrl
+    P->>VP: mở trang thanh toán, bấm gửi OTP
+    VP->>BL: POST /internal/otp
+    BL-)MQ: payment.otp_issued
+    MQ-)NT: payment.otp_issued
+    NT-->>P: email OTP 6 số (hiệu lực 5 phút)
+    P->>VP: nhập OTP, xác nhận
+    VP->>BL: webhook IPN (chữ ký HMAC, gửi 2 lần)
+    BL->>BL: idempotency theo txnRef:status, lần 2 bị bỏ qua
+    BL-)MQ: payment.completed
+    MQ-)SC: payment.completed
+    SC->>SC: pending → confirmed, slot → BOOKED
+    SC-)MQ: appointment.confirmed
+    MQ-)TL: tạo phòng Jitsi (SCHEDULED)
+    MQ-)RC: lưu bản sao lịch để kiểm tra quyền
+    MQ-)NT: thông báo + đặt nhắc lịch 24h và 1h
+  end

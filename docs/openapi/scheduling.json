@@ -1,0 +1,595 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SINA Clinic - Scheduling Service",
+    "version": "1.0.0",
+    "description": "Ca lam viec (tu duyet 5 luat), slot, nghi phep, dat/huy/doi lich, FSM lich hen. Moi loi tra ve dang { error: MA_LOI, message }."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "paths": {
+    "/api/scheduling/doctors": {
+      "get": {
+        "summary": "Bac si con lich trong, loc theo ?specialty=, kem slot gan nhat va gia",
+        "tags": [
+          "Scheduling Service"
+        ],
+        "operationId": "get_scheduling__doctors",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: moi nguoi dung da dang nhap."
+      }
+    },
+    "/api/scheduling/doctors/me/work-state": {
+      "get": {
+        "summary": "Trang thai lam viec hien tai: AVAILABLE, IN_CONSULTATION, OFF_DUTY",
+        "tags": [
+          "Scheduling Service"
+        ],
+        "operationId": "get_scheduling__doctors_me_work_state",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          },
+          "403": {
+            "description": "FORBIDDEN"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: doctor."
+      }
+    },
+    "/api/scheduling/doctors/{id}/slots": {
+      "get": {
+        "summary": "Slot AVAILABLE sap toi cua mot bac si",
+        "tags": [
+          "Scheduling Service"
+        ],
+        "operationId": "get_scheduling__doctors_id_slots",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: moi nguoi dung da dang nhap."
+      }
+    },
+    "/api/scheduling/shifts": {
+      "post": {
+        "summary": "Dang ky ca; he thong tu duyet theo 5 luat",
+        "tags": [
+          "Scheduling Service"
+        ],
+        "operationId": "post_scheduling__shifts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "201 { id, status: APPROVED|REJECTED, rejectCode? }"
+          },
+          "201": {
+            "description": "201 { id, status: APPROVED|REJECTED, rejectCode? }"
+          },
+          "400": {
+            "description": "INVALID_SHIFT"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          },
+          "403": {
+            "description": "FORBIDDEN"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: doctor.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "weekday": {
+                    "type": "string",
+                    "description": "0..6"
+                  },
+                  "startTime": {
+                    "type": "string",
+                    "description": "HH:MM"
+                  },
+                  "endTime": {
+                    "type": "string",
+                    "description": "HH:MM"
+                  },
+                  "slotMinutes": {
+                    "type": "string",
+                    "description": "15|20|30|45"
+                  },
+                  "fee": {
+                    "type": "string",
+                    "description": "number(1..10000000)"
+                  },
+                  "startDate": {
+                    "type": "string",
+                    "description": "YYYY-MM-DD"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scheduling/shifts/mine": {
+      "get": {
+        "summary": "Ca da dang ky cua toi",
+        "tags": [
+          "Scheduling Service"
+        ],
+        "operationId": "get_scheduling__shifts_mine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          },
+          "403": {
+            "description": "FORBIDDEN"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: doctor."
+      }
+    },
+    "/api/scheduling/shifts/{id}": {
+      "delete": {
+        "summary": "Huy ca (chi khi chua co lich dat)",
+        "tags": [
+          "Scheduling Service"
+        ],
+        "operationId": "delete_scheduling__shifts_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          },
+          "403": {
+            "description": "FORBIDDEN"
+          },
+          "404": {
+            "description": "NOT_FOUND"
+          },
+          "409": {
+            "description": "HAS_BOOKINGS"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: doctor."
+      }
+    },
+    "/api/scheduling/leaves": {
+      "post": {
+        "summary": "Xin nghi phep (tu duyet); huy hang loat va hoan tien lich bi anh huong",
+        "tags": [
+          "Scheduling Service"
+        ],
+        "operationId": "post_scheduling__leaves",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "400": {
+            "description": "INVALID_LEAVE"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          },
+          "403": {
+            "description": "FORBIDDEN, DOCTOR_NOT_VERIFIED"
+          },
+          "409": {
+            "description": "LEAVE_OVERLAP"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: doctor.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "fromDate": {
+                    "type": "string",
+                    "description": "YYYY-MM-DD"
+                  },
+                  "toDate": {
+                    "type": "string",
+                    "description": "YYYY-MM-DD"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scheduling/leaves/mine": {
+      "get": {
+        "summary": "Ky nghi cua toi",
+        "tags": [
+          "Scheduling Service"
+        ],
+        "operationId": "get_scheduling__leaves_mine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          },
+          "403": {
+            "description": "FORBIDDEN"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: doctor."
+      }
+    },
+    "/api/scheduling/appointments": {
+      "post": {
+        "summary": "Dat lich: giu slot 15 phut bang optimistic locking, khoi tao thanh toan",
+        "tags": [
+          "Scheduling Service"
+        ],
+        "operationId": "post_scheduling__appointments",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "201 lich hen status=pending"
+          },
+          "201": {
+            "description": "201 lich hen status=pending"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          },
+          "403": {
+            "description": "FORBIDDEN"
+          },
+          "404": {
+            "description": "SLOT_NOT_FOUND"
+          },
+          "409": {
+            "description": "TOO_SOON, TOO_FAR, PATIENT_CLASH, SLOT_TAKEN"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: patient.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "slotId": {
+                    "type": "string",
+                    "description": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scheduling/appointments/mine": {
+      "get": {
+        "summary": "Lich hen cua toi (phan trang ?page=&limit=, header X-Total-Count)",
+        "tags": [
+          "Scheduling Service"
+        ],
+        "operationId": "get_scheduling__appointments_mine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: moi nguoi dung da dang nhap."
+      }
+    },
+    "/api/scheduling/appointments/{id}": {
+      "get": {
+        "summary": "Chi tiet lich hen kem nhat ky FSM va ty le hoan tien neu huy luc nay",
+        "tags": [
+          "Scheduling Service"
+        ],
+        "operationId": "get_scheduling__appointments_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          },
+          "404": {
+            "description": "NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: moi nguoi dung da dang nhap."
+      }
+    },
+    "/api/scheduling/appointments/{id}/cancel": {
+      "post": {
+        "summary": "Huy lich: hoan 100% (>=24h), 50% (2-24h), 0% (<2h); Saga hoan tien",
+        "tags": [
+          "Scheduling Service"
+        ],
+        "operationId": "post_scheduling__appointments_id_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          },
+          "403": {
+            "description": "FORBIDDEN"
+          },
+          "409": {
+            "description": "CANNOT_CANCEL"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: patient."
+      }
+    },
+    "/api/scheduling/appointments/{id}/retry-payment": {
+      "post": {
+        "summary": "Thu thanh toan lai (toi da 3 lan trong thoi gian giu cho)",
+        "tags": [
+          "Scheduling Service"
+        ],
+        "operationId": "post_scheduling__appointments_id_retry_payment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          },
+          "403": {
+            "description": "FORBIDDEN"
+          },
+          "409": {
+            "description": "CANNOT_RETRY"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: patient."
+      }
+    },
+    "/api/scheduling/appointments/{id}/reschedule": {
+      "post": {
+        "summary": "Doi sang slot khac cua cung bac si (giu slot moi truoc, nha slot cu sau)",
+        "tags": [
+          "Scheduling Service"
+        ],
+        "operationId": "post_scheduling__appointments_id_reschedule",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          },
+          "403": {
+            "description": "FORBIDDEN"
+          },
+          "409": {
+            "description": "CANNOT_RESCHEDULE, SLOT_TAKEN, TOO_SOON"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: patient.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "slotId": {
+                    "type": "string",
+                    "description": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scheduling/stats/me": {
+      "get": {
+        "summary": "Thong ke cho dashboard",
+        "tags": [
+          "Scheduling Service"
+        ],
+        "operationId": "get_scheduling__stats_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: moi nguoi dung da dang nhap."
+      }
+    }
+  }
+}

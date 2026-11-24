@@ -1,0 +1,388 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SINA Clinic - Identity Service",
+    "version": "1.0.0",
+    "description": "Tai khoan, xac minh email OTP, ho so bac si, FSM ho so bac si. Moi loi tra ve dang { error: MA_LOI, message }."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "paths": {
+    "/api/identity/specialties": {
+      "get": {
+        "summary": "Danh sach chuyen khoa",
+        "tags": [
+          "Identity Service"
+        ],
+        "operationId": "get_identity__specialties",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Mang ten chuyen khoa"
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/identity/register": {
+      "post": {
+        "summary": "Dang ky tai khoan (benh nhan hoac bac si), gui OTP xac minh email",
+        "tags": [
+          "Identity Service"
+        ],
+        "operationId": "post_identity__register",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "201 { id, role, verificationRequired, expiresInMinutes }"
+          },
+          "201": {
+            "description": "201 { id, role, verificationRequired, expiresInMinutes }"
+          },
+          "400": {
+            "description": "INVALID_ROLE, INVALID_EMAIL, WEAK_PASSWORD, INVALID_FIELD, MISSING_DOCTOR_INFO"
+          },
+          "409": {
+            "description": "EMAIL_TAKEN"
+          },
+          "413": {
+            "description": "PAYLOAD_TOO_LARGE"
+          },
+          "429": {
+            "description": "RATE_LIMITED"
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "description": "patient|doctor"
+                  },
+                  "email": {
+                    "type": "string",
+                    "description": "string(<=120)"
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "string(6..72)"
+                  },
+                  "fullName": {
+                    "type": "string",
+                    "description": "string(1..100)"
+                  },
+                  "specialty": {
+                    "type": "string",
+                    "description": "string (bac si)"
+                  },
+                  "licenseNo": {
+                    "type": "string",
+                    "description": "string(<=30) (bac si)"
+                  },
+                  "phone": {
+                    "type": "string",
+                    "description": "string?"
+                  },
+                  "dob": {
+                    "type": "string",
+                    "description": "string?"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/identity/verify-email": {
+      "post": {
+        "summary": "Nhap OTP 6 so de kich hoat tai khoan (het han 10 phut, toi da 5 lan sai)",
+        "tags": [
+          "Identity Service"
+        ],
+        "operationId": "post_identity__verify_email",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "200 { token, user }"
+          },
+          "400": {
+            "description": "BAD_OTP, OTP_EXPIRED"
+          },
+          "429": {
+            "description": "OTP_LOCKED"
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "description": "string"
+                  },
+                  "otp": {
+                    "type": "string",
+                    "description": "string(6)"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/identity/resend-otp": {
+      "post": {
+        "summary": "Gui lai OTP (cach nhau 60 giay)",
+        "tags": [
+          "Identity Service"
+        ],
+        "operationId": "post_identity__resend_otp",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "200 { ok }"
+          },
+          "429": {
+            "description": "OTP_TOO_SOON"
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "description": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/identity/login": {
+      "post": {
+        "summary": "Dang nhap, tra JWT song 12 gio",
+        "tags": [
+          "Identity Service"
+        ],
+        "operationId": "post_identity__login",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "200 { token, user }"
+          },
+          "401": {
+            "description": "BAD_CREDENTIALS"
+          },
+          "403": {
+            "description": "EMAIL_NOT_VERIFIED, ACCOUNT_CLOSED"
+          },
+          "429": {
+            "description": "RATE_LIMITED"
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "description": "string"
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/identity/me": {
+      "get": {
+        "summary": "Thong tin tai khoan hien tai (kem ho so neu la bac si)",
+        "tags": [
+          "Identity Service"
+        ],
+        "operationId": "get_identity__me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: moi nguoi dung da dang nhap."
+      }
+    },
+    "/api/identity/doctors": {
+      "get": {
+        "summary": "Danh sach bac si dang hoat dong",
+        "tags": [
+          "Identity Service"
+        ],
+        "operationId": "get_identity__doctors",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: moi nguoi dung da dang nhap."
+      }
+    },
+    "/api/identity/doctors/me/status": {
+      "get": {
+        "summary": "Trang thai ho so bac si va nhat ky chuyen trang thai (FSM)",
+        "tags": [
+          "Identity Service"
+        ],
+        "operationId": "get_identity__doctors_me_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          },
+          "403": {
+            "description": "FORBIDDEN"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: doctor."
+      }
+    },
+    "/api/identity/doctors/me/resubmit": {
+      "post": {
+        "summary": "Nop lai ho so bi tu choi (toi da 3 lan)",
+        "tags": [
+          "Identity Service"
+        ],
+        "operationId": "post_identity__doctors_me_resubmit",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          },
+          "403": {
+            "description": "FORBIDDEN"
+          },
+          "409": {
+            "description": "NOT_REJECTED, NO_RETRIES_LEFT"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: doctor.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "licenseNo": {
+                    "type": "string",
+                    "description": "string?"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/identity/doctors/me/deactivate": {
+      "post": {
+        "summary": "Bac si tu dong tai khoan (khi khong con lich sap toi)",
+        "tags": [
+          "Identity Service"
+        ],
+        "operationId": "post_identity__doctors_me_deactivate",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          },
+          "403": {
+            "description": "FORBIDDEN"
+          },
+          "409": {
+            "description": "NOT_ACTIVE, HAS_FUTURE_APPOINTMENTS"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: doctor."
+      }
+    }
+  }
+}

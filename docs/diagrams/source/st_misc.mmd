@@ -1,0 +1,20 @@
+stateDiagram-v2
+  direction LR
+  state "Ca làm việc" as SH {
+    [*] --> SUBMITTED
+    SUBMITTED --> APPROVED: đạt 5 luật
+    SUBMITTED --> REJECTED: vi phạm, kèm rejectCode
+    APPROVED --> CANCELLED: bác sĩ hủy ca (chưa có lịch)
+  }
+  state "Phòng khám (Tele)" as SE {
+    [*] --> SCHEDULED: lịch confirmed
+    SCHEDULED --> LIVE: cả hai đã vào
+    SCHEDULED --> MISSED: quá 15 phút không đủ người
+    SCHEDULED --> CANCELLED: lịch bị hủy
+    LIVE --> ENDED: ghi bệnh án
+    SCHEDULED --> ENDED: ghi bệnh án
+  }
+  state "Đơn thuốc (Records)" as RX {
+    [*] --> ISSUED: bác sĩ kê đơn
+    ISSUED --> COLLECTED: bệnh nhân đã nhận thuốc
+  }

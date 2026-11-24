@@ -1,0 +1,63 @@
+digraph G {
+ graph [rankdir=LR, fontname="DejaVu Sans", nodesep=0.3, ranksep=1.7, pad=0.3, label="Hình 1c. Khám từ xa, bệnh án, đơn thuốc và các tác vụ nền", labelloc=t, fontsize=16];
+ node [fontname="DejaVu Sans", fontsize=12]; edge [fontname="DejaVu Sans", fontsize=10, color="#5b8f95", arrowhead=none];
+ subgraph cluster_p { label="Actor chính"; style="rounded"; color="#0095A8"; node [shape=box, style="filled", fillcolor="#0095A8", fontcolor=white, width=1.7, height=0.6];
+  P1 [label="P1 Bệnh nhân"];
+  P2 [label="P2 Bác sĩ"];
+  P3 [label="P3 Bộ hẹn giờ"];
+ }
+ subgraph cluster_uc { label="Hệ thống SINA Clinic"; style="rounded"; color="#00404F"; node [shape=ellipse, style=filled, fillcolor="#E0F4F6", color="#0095A8"];
+  UC15 [label="UC15\nNhắc lịch 24h / 1h", fillcolor="#FFF6D6", color="#C9A227"];
+  UC17 [label="UC17\nKhám từ xa (Jitsi)"];
+  UC18 [label="UC18\nGhi bệnh án, kê đơn"];
+  UC19 [label="UC19\nXem bệnh án, đơn thuốc"];
+  UC20 [label="UC20\nXem hồ sơ bệnh nhân"];
+  UC21 [label="UC21\nNhận thuốc"];
+  UC22 [label="UC22\nPhát hiện vắng mặt", fillcolor="#FFF6D6", color="#C9A227"];
+  UC23 [label="UC23\nKiểm tra giấy phép\nđịnh kỳ", fillcolor="#FFF6D6", color="#C9A227"];
+  UC26 [label="UC26\nXem nhật ký truy cập"];
+ }
+ subgraph cluster_s { label="Actor phụ"; style="rounded"; color="#5b8f95"; node [shape=box, style="filled", fillcolor="#F4FBFC", color="#5b8f95"];
+  S3 [label="S3 Doctor Verification"];
+  S6 [label="S6 Email SMTP"];
+  S7 [label="S7 Notification"];
+  S8 [label="S8 Jitsi Meet"];
+  S9 [label="S9 Event Bus"];
+  S12 [label="S12 FHIR Mapper"];
+  S13 [label="S13 Audit Logger"];
+  S14 [label="S14 Drug Catalog"];
+  S15 [label="S15 Google Maps"];
+  S16 [label="S16 Trình duyệt/máy in"];
+ }
+ subgraph cluster_o { label="Actor offstage"; style="rounded,dashed"; color="#999999"; node [shape=box, style="dashed", color="#777777"];
+  O2 [label="O2 Nhà thuốc"];
+  O4 [label="O4 Vận hành (DevOps)"];
+ }
+ P1 -> UC17;
+ P1 -> UC19;
+ P1 -> UC21;
+ P1 -> UC26;
+ P2 -> UC17;
+ P2 -> UC18;
+ P2 -> UC20;
+ P3 -> UC15;
+ P3 -> UC22;
+ P3 -> UC23;
+ UC15 -> S7;
+ UC15 -> S6;
+ UC17 -> S8;
+ UC18 -> S12;
+ UC18 -> S13;
+ UC18 -> S14;
+ UC19 -> S12;
+ UC20 -> S13;
+ UC21 -> S15;
+ UC21 -> S16;
+ UC22 -> S9;
+ UC23 -> S3;
+ UC26 -> S13;
+ O2 -> UC21 [style=dashed, color="#999999"];
+ O4 -> UC23 [style=dashed, color="#999999"];
+ UC21 -> UC19 [style=dashed, arrowhead=open, label="«extend»", constraint=false];
+ UC18 -> UC17 [style=dashed, arrowhead=open, label="«extend»", constraint=false];
+}

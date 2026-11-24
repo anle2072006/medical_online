@@ -1,0 +1,16 @@
+stateDiagram-v2
+  [*] --> registered: đăng ký
+  registered --> verifying: xác minh email xong
+  verifying --> active: giấy phép VALID
+  verifying --> rejected: INVALID, EXPIRED hoặc REVOKED
+  rejected --> registered: nộp lại (tối đa 3 lần)
+  active --> on_leave: bắt đầu kỳ nghỉ
+  on_leave --> active: hết kỳ nghỉ
+  active --> suspended: giấy phép hết hạn / vắng 3 lần trong 30 ngày
+  on_leave --> suspended: giấy phép hết hạn
+  suspended --> active: giấy phép hợp lệ lại / hết 7 ngày khóa
+  active --> deactivated: giấy phép bị thu hồi / bác sĩ tự đóng
+  on_leave --> deactivated: giấy phép bị thu hồi
+  suspended --> deactivated: giấy phép bị thu hồi
+  rejected --> [*]: hết 3 lần nộp
+  deactivated --> [*]

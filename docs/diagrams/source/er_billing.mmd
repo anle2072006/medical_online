@@ -1,0 +1,30 @@
+erDiagram
+  invoices ||--o{ payments : "invoice_id"
+  invoices ||--o{ refunds : "invoice_id"
+  invoices {
+    string id PK
+    string appointment_id UK "tham chiếu Scheduling"
+    string patient_id "tham chiếu Identity"
+    int amount
+    string status "PENDING PAID FAILED REFUNDING REFUNDED VOID"
+    int attempts
+  }
+  payments {
+    string id PK
+    string invoice_id FK
+    string txn_ref UK
+    string status "CREATED SUCCESS FAILED"
+    string pay_url
+  }
+  refunds {
+    string id PK
+    string invoice_id FK
+    int percent
+    int amount
+    string status
+    string refund_ref
+  }
+  processed_ipn {
+    string idempotency_key UK "txnRef:status"
+    string at
+  }

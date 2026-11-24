@@ -1,0 +1,35 @@
+digraph G {
+  graph [rankdir=TB, fontname="DejaVu Sans", nodesep=0.28, ranksep=0.75, splines=ortho, pad=0.3, newrank=true];
+  node  [fontname="DejaVu Sans", fontsize=12, shape=box, style="rounded,filled", fillcolor="#E0F4F6", color="#0095A8", penwidth=1.5];
+  edge  [fontname="DejaVu Sans", fontsize=10, color="#005162"];
+
+  browser [label="Trình duyệt (HTML/CSS/JS thuần): bệnh nhân, bác sĩ", fillcolor="#FFFFFF"];
+  gw [label=<<b>API Gateway :8080</b><br/>JWT lần đầu · rate limit 300/phút · đăng nhập 20/phút/IP<br/>chặn /internal và /webhooks · x-request-id · phục vụ giao diện và /docs>, fillcolor="#0095A8", fontcolor="white", color="#00404F"];
+
+  node [shape=plain, style="", fillcolor="white"];
+  identity   [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="5" color="#0095A8" bgcolor="#E0F4F6"><tr><td><b>Identity :3001</b><br/>tài khoản, OTP email<br/>FSM hồ sơ bác sĩ</td></tr><tr><td bgcolor="#F4FBFC" border="1" color="#5b8f95">🛢 identity_db</td></tr></table>>];
+  scheduling [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="5" color="#0095A8" bgcolor="#E0F4F6"><tr><td><b>Scheduling :3002</b><br/>ca (5 luật), slot, lịch hẹn<br/>FSM, nghỉ phép</td></tr><tr><td bgcolor="#F4FBFC" border="1" color="#5b8f95">🛢 scheduling_db</td></tr></table>>];
+  billing    [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="5" color="#0095A8" bgcolor="#E0F4F6"><tr><td><b>Billing :3003</b><br/>hóa đơn, VNPay, webhook<br/>idempotent, hoàn tiền</td></tr><tr><td bgcolor="#F4FBFC" border="1" color="#5b8f95">🛢 billing_db</td></tr></table>>];
+  records    [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="5" color="#0095A8" bgcolor="#E0F4F6"><tr><td><b>Records :3004</b><br/>bệnh án FHIR, đơn thuốc<br/>nhật ký truy cập</td></tr><tr><td bgcolor="#F4FBFC" border="1" color="#5b8f95">🛢 records_db</td></tr></table>>];
+  tele       [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="5" color="#0095A8" bgcolor="#E0F4F6"><tr><td><b>Tele :3005</b><br/>phòng Jitsi<br/>phát hiện vắng mặt</td></tr><tr><td bgcolor="#F4FBFC" border="1" color="#5b8f95">🛢 tele_db</td></tr></table>>];
+  notify     [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="5" color="#0095A8" bgcolor="#E0F4F6"><tr><td><b>Notify :3006</b><br/>thông báo, email<br/>nhắc lịch</td></tr><tr><td bgcolor="#F4FBFC" border="1" color="#5b8f95">🛢 notify_db</td></tr></table>>];
+
+  node [shape=box, style="rounded,filled"];
+  mq [label=<<b>RabbitMQ 3.13</b>: topic exchange <i>clinic.events</i> · dead-letter exchange <i>clinic.dlx</i> · mỗi service có hàng đợi &lt;tên&gt;.q và &lt;tên&gt;.dlq>, fillcolor="#FFF6D6", color="#C9A227"];
+  node [fillcolor="#FFFFFF", color="#C9A227"];
+  mock [label=<<b>mock-externals :4000</b><br/>Doctor Verification<br/>VNPay sandbox>];
+  smtp [label="SMTP\n(Gmail / Mailtrap)"];
+  jitsi [label="Jitsi Meet\n(meet.jit.si)"];
+
+  browser -> gw [label="REST/HTTP", color="#005162"];
+  gw -> identity; gw -> scheduling; gw -> billing; gw -> records; gw -> tele; gw -> notify;
+  {rank=same; identity; scheduling; billing; records; tele; notify;}
+  identity -> mq [style=dashed, color="#C9A227", dir=both]; scheduling -> mq [style=dashed, color="#C9A227", dir=both]; billing -> mq [style=dashed, color="#C9A227", dir=both];
+  records -> mq [style=dashed, color="#C9A227", dir=both]; tele -> mq [style=dashed, color="#C9A227", dir=both]; notify -> mq [style=dashed, color="#C9A227", dir=both];
+  {rank=same; mq; mock; smtp; jitsi;}
+  mq -> mock [style=invis]; mock -> smtp [style=invis]; smtp -> jitsi [style=invis];
+  identity -> mock [label="REST /verify", constraint=false, color="#C9A227", penwidth=1.2];
+  billing -> mock [label="REST /vnpay/*  ⇄  webhook IPN", constraint=false, color="#C9A227", penwidth=1.2];
+  notify -> smtp [label="email", constraint=false, color="#C9A227"];
+  tele -> jitsi [label="đường dẫn phòng", constraint=false, color="#C9A227", style=dotted];
+}

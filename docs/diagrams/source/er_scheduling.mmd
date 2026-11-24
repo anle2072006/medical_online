@@ -1,0 +1,65 @@
+erDiagram
+  doctors_cache ||--o{ shifts : "doctor_id"
+  doctors_cache ||--o{ leaves : "doctor_id"
+  shifts ||--o{ slots : "shift_id"
+  slots ||--o| appointments : "slot_id (hold_appt)"
+  appointments ||--o{ appointment_log : "appointment_id"
+  doctors_cache {
+    string id PK
+    string full_name
+    string specialty
+    string status
+  }
+  shifts {
+    string id PK
+    string doctor_id FK
+    int weekday
+    string start_time
+    string end_time
+    int slot_minutes
+    int fee
+    string start_date
+    string status "SUBMITTED APPROVED REJECTED CANCELLED"
+    string reject_code
+  }
+  leaves {
+    string id PK
+    string doctor_id FK
+    string from_date
+    string to_date
+    string status "APPROVED ACTIVE ENDED"
+  }
+  slots {
+    string id PK
+    string doctor_id FK
+    string shift_id FK
+    string date
+    string start
+    string end_time
+    int fee
+    string status "AVAILABLE HELD BOOKED DONE BLOCKED"
+    int version "optimistic lock"
+    string hold_appt
+    string block_reason
+  }
+  appointments {
+    string id PK
+    string slot_id FK
+    string patient_id "tham chiếu Identity"
+    string doctor_id "tham chiếu Identity"
+    string date
+    string start
+    int fee
+    string status "FSM 10 trạng thái"
+    string expires_at
+    int retry_count
+    string cancelled_by
+    int refund_percent
+  }
+  appointment_log {
+    string appointment_id FK
+    string from_status
+    string to_status
+    string reason
+    string at
+  }

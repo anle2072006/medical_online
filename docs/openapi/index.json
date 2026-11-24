@@ -1,0 +1,26 @@
+[
+  {
+    "name": "Identity Service",
+    "url": "/docs/openapi/identity.json"
+  },
+  {
+    "name": "Scheduling Service",
+    "url": "/docs/openapi/scheduling.json"
+  },
+  {
+    "name": "Billing Service",
+    "url": "/docs/openapi/billing.json"
+  },
+  {
+    "name": "Records Service",
+    "url": "/docs/openapi/records.json"
+  },
+  {
+    "name": "Teleconsultation Service",
+    "url": "/docs/openapi/tele.json"
+  },
+  {
+    "name": "Notification Service",
+    "url": "/docs/openapi/notify.json"
+  }
+]

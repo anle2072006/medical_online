@@ -1,0 +1,30 @@
+sequenceDiagram
+  participant U as Bác sĩ
+  participant GW as Gateway
+  participant ID as Identity
+  participant MQ as RabbitMQ
+  participant NT as Notify
+  participant DV as Doctor Verification
+  participant SC as Scheduling
+  U->>GW: POST /register (bác sĩ, số giấy phép)
+  GW->>ID: chuyển tiếp (đã qua rate limit)
+  ID->>ID: kiểm tra dữ liệu, băm mật khẩu, lưu user chưa xác minh, doctor = registered
+  ID-)MQ: user.otp_issued (OTP 6 số)
+  MQ-)NT: user.otp_issued
+  NT-->>U: email chứa OTP (hết hạn 10 phút)
+  U->>GW: POST /verify-email (email, OTP)
+  GW->>ID: chuyển tiếp
+  ID->>ID: so khớp HMAC, claim verified=true (nguyên tử)
+  ID-)MQ: user.registered, doctor.registered
+  ID-->>U: 200 token (đăng nhập luôn)
+  MQ-)ID: doctor.registered
+  ID->>ID: registered → verifying
+  loop thử lại 2s, 5s, 15s nếu hệ thống ngoài lỗi
+    ID->>DV: POST /verify (số giấy phép)
+  end
+  DV-->>ID: VALID (hết hạn 2028-12-31)
+  ID->>ID: verifying → active, ghi nhật ký FSM
+  ID-)MQ: doctor.verified
+  MQ-)SC: doctor.verified (cập nhật bản sao bác sĩ)
+  MQ-)NT: doctor.verified
+  NT-->>U: thông báo hồ sơ đã xác thực

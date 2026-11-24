@@ -1,0 +1,58 @@
+digraph G {
+ graph [rankdir=LR, fontname="DejaVu Sans", nodesep=0.3, ranksep=1.7, pad=0.3, label="Hình 1b. Đặt lịch, thanh toán, hủy và đổi lịch", labelloc=t, fontsize=16];
+ node [fontname="DejaVu Sans", fontsize=12]; edge [fontname="DejaVu Sans", fontsize=10, color="#5b8f95", arrowhead=none];
+ subgraph cluster_p { label="Actor chính"; style="rounded"; color="#0095A8"; node [shape=box, style="filled", fillcolor="#0095A8", fontcolor=white, width=1.7, height=0.6];
+  P1 [label="P1 Bệnh nhân"];
+  P3 [label="P3 Bộ hẹn giờ"];
+  P4 [label="P4 VNPay (webhook)"];
+ }
+ subgraph cluster_uc { label="Hệ thống SINA Clinic"; style="rounded"; color="#00404F"; node [shape=ellipse, style=filled, fillcolor="#E0F4F6", color="#0095A8"];
+  UC7 [label="UC07\nTìm bác sĩ, xem slot"];
+  UC8 [label="UC08\nĐặt lịch khám"];
+  UC9 [label="UC09\nThanh toán VNPay + OTP"];
+  UC10 [label="UC10\nThử thanh toán lại"];
+  UC11 [label="UC11\nHủy lịch, hoàn tiền"];
+  UC12 [label="UC12\nĐổi lịch"];
+  UC13 [label="UC13\nSinh slot tự động", fillcolor="#FFF6D6", color="#C9A227"];
+  UC14 [label="UC14\nNhả slot hết hạn", fillcolor="#FFF6D6", color="#C9A227"];
+  UC16 [label="UC16\nNhận kết quả thanh toán\n(webhook)", fillcolor="#FFF6D6", color="#C9A227"];
+ }
+ subgraph cluster_s { label="Actor phụ"; style="rounded"; color="#5b8f95"; node [shape=box, style="filled", fillcolor="#F4FBFC", color="#5b8f95"];
+  S2 [label="S2 API Gateway"];
+  S4 [label="S4 VNPay"];
+  S5 [label="S5 OTP"];
+  S7 [label="S7 Notification"];
+  S9 [label="S9 Event Bus"];
+  S11 [label="S11 Slot Lock"];
+ }
+ subgraph cluster_o { label="Actor offstage"; style="rounded,dashed"; color="#999999"; node [shape=box, style="dashed", color="#777777"];
+  O3 [label="O3 Ngân hàng, tổ chức thẻ"];
+  O6 [label="O6 Giảng viên, hội đồng"];
+ }
+ P1 -> UC7;
+ P1 -> UC8;
+ P1 -> UC9;
+ P1 -> UC10;
+ P1 -> UC11;
+ P1 -> UC12;
+ P3 -> UC13;
+ P3 -> UC14;
+ P4 -> UC16;
+ UC7 -> S2;
+ UC8 -> S11;
+ UC8 -> S9;
+ UC9 -> S4;
+ UC9 -> S5;
+ UC9 -> S7;
+ UC10 -> S4;
+ UC11 -> S4;
+ UC11 -> S9;
+ UC12 -> S11;
+ UC13 -> S9;
+ UC14 -> S11;
+ UC16 -> S9;
+ O3 -> UC9 [style=dashed, color="#999999"];
+ O6 -> UC8 [style=dashed, color="#999999"];
+ UC9 -> UC16 [style=dashed, arrowhead=open, label="«include»", constraint=false];
+ UC10 -> UC9 [style=dashed, arrowhead=open, label="«include»", constraint=false];
+}

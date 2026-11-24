@@ -1,0 +1,43 @@
+erDiagram
+  appts ||--o| records : "appointment_id"
+  records ||--o| prescriptions : "record_id"
+  drugs ||--o{ prescriptions : "items.drugId (nhúng)"
+  appts {
+    string appointment_id UK "bản sao tối thiểu từ sự kiện"
+    string patient_id
+    string doctor_id
+    string patient_name
+    string doctor_name
+    string status
+  }
+  records {
+    string id PK
+    string appointment_id UK
+    string patient_id
+    string doctor_id
+    string symptoms
+    string diagnosis
+    string notes
+    object fhir "Encounter"
+  }
+  prescriptions {
+    string id PK
+    string code UK "RX-XXXXXX"
+    string record_id FK
+    string patient_id
+    string status "ISSUED COLLECTED"
+    array items "drugId, dosage, quantity"
+    string collected_at
+  }
+  drugs {
+    int id PK
+    string name
+    string unit
+  }
+  access_logs {
+    string patient_id
+    string actor_id
+    string actor_name
+    string action "VIEW_RECORDS WRITE_RECORD"
+    string at
+  }

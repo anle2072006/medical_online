@@ -1,0 +1,35 @@
+sequenceDiagram
+  participant P as Bệnh nhân
+  participant GW as Gateway
+  participant SC as Scheduling
+  participant MQ as RabbitMQ
+  participant BL as Billing
+  participant VP as VNPay (giả lập)
+  participant NT as Notify
+  P->>GW: POST /appointments/{id}/cancel
+  GW->>SC: chuyển tiếp
+  SC->>SC: tính tỷ lệ: ≥24h 100%, 2–24h 50%, <2h 0%
+  SC->>SC: confirmed → cancelled (claim nguyên tử), trả slot AVAILABLE
+  SC-)MQ: appointment.cancelled
+  SC-->>P: 200 refundPercent
+  alt đã thanh toán và tỷ lệ > 0
+    SC->>SC: cancelled → refunding
+    SC-)MQ: refund.requested (percent)
+    MQ-)BL: refund.requested
+    BL->>BL: hóa đơn PAID → REFUNDING, tính số tiền hoàn
+    BL->>VP: POST /vnpay/refund
+    alt VNPay lỗi
+      VP--xBL: lỗi
+      BL->>MQ: bus thử lại tối đa 3 lần, quá hạn vào dead-letter queue
+    else thành công
+      VP-->>BL: refundRef
+      BL->>BL: ghi refunds, hóa đơn → REFUNDED
+      BL-)MQ: refund.completed
+      MQ-)SC: refund.completed
+      SC->>SC: refunding → refunded
+      MQ-)NT: email thông báo đã hoàn tiền
+    end
+  else chưa thanh toán hoặc 0%
+    MQ-)BL: appointment.cancelled (paid=false) → hóa đơn VOID
+    MQ-)NT: thông báo hủy
+  end

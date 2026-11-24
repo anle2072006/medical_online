@@ -1,0 +1,41 @@
+erDiagram
+  users ||--o| doctors : "user_id (vai trò doctor)"
+  users ||--o{ doctor_status_log : "doctor_id"
+  users ||--o{ doctor_absences : "doctor_id"
+  users {
+    string id PK
+    string email UK
+    string password_hash
+    string role "patient | doctor"
+    string full_name
+    string phone
+    string dob
+    bool verified
+    string otp_hash
+    string otp_expires
+    int otp_tries
+    long otp_sent_at
+    string created_at
+  }
+  doctors {
+    string user_id PK
+    string specialty
+    string license_no
+    string license_expiry
+    string status "FSM 7 trạng thái"
+    string reason
+    int verify_attempts
+    string suspended_until
+  }
+  doctor_status_log {
+    string doctor_id FK
+    string from_status
+    string to_status
+    string reason
+    string at
+  }
+  doctor_absences {
+    string doctor_id FK
+    string appointment_id UK
+    string at
+  }

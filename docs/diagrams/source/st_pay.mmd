@@ -1,0 +1,12 @@
+stateDiagram-v2
+  direction LR
+  state "Hóa đơn (Billing)" as INV {
+    [*] --> PENDING: có lịch pending
+    PENDING --> PAID: IPN status 00
+    PENDING --> FAILED: IPN lỗi
+    FAILED --> PENDING: thử lại, tạo giao dịch mới
+    PENDING --> VOID: lịch failed / hủy
+    FAILED --> VOID: lịch failed / hủy
+    PAID --> REFUNDING: refund.requested
+    REFUNDING --> REFUNDED: VNPay hoàn xong
+  }

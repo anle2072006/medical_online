@@ -1,0 +1,39 @@
+erDiagram
+  users ||--o{ notifications : "user_id"
+  sessions {
+    string appointment_id UK "tham chiếu Scheduling"
+    string room "sina-clinic-uuid"
+    string patient_id
+    string doctor_id
+    string date
+    string start
+    string status "SCHEDULED LIVE ENDED MISSED CANCELLED"
+    string doctor_joined_at
+    string patient_joined_at
+  }
+  users {
+    string id PK "bản sao từ sự kiện"
+    string email
+    string full_name
+  }
+  notifications {
+    string id PK
+    string user_id FK
+    string event_type
+    string title
+    string body
+    string status "PENDING SENT FAILED SKIPPED"
+    int retry_count
+    bool read
+    bool inapp
+  }
+  reminders {
+    string appointment_id UK
+    string patient_id
+    string doctor_id
+    string date
+    string start
+    bool sent24
+    bool sent1
+    bool active
+  }

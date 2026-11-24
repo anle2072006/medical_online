@@ -1,0 +1,57 @@
+digraph G {
+ graph [rankdir=LR, fontname="DejaVu Sans", nodesep=0.3, ranksep=1.7, pad=0.3, label="Hình 1a. Tài khoản, xác thực giấy phép, ca làm việc, nghỉ phép", labelloc=t, fontsize=16];
+ node [fontname="DejaVu Sans", fontsize=12]; edge [fontname="DejaVu Sans", fontsize=10, color="#5b8f95", arrowhead=none];
+ subgraph cluster_p { label="Actor chính"; style="rounded"; color="#0095A8"; node [shape=box, style="filled", fillcolor="#0095A8", fontcolor=white, width=1.7, height=0.6];
+  P1 [label="P1 Bệnh nhân"];
+  P2 [label="P2 Bác sĩ"];
+ }
+ subgraph cluster_uc { label="Hệ thống SINA Clinic"; style="rounded"; color="#00404F"; node [shape=ellipse, style=filled, fillcolor="#E0F4F6", color="#0095A8"];
+  UC1 [label="UC01\nĐăng ký tài khoản"];
+  UC2 [label="UC02\nXác minh email (OTP)"];
+  UC3 [label="UC03\nĐăng nhập"];
+  UC4 [label="UC04\nGửi / nộp lại giấy phép"];
+  UC5 [label="UC05\nĐăng ký ca (tự duyệt)"];
+  UC6 [label="UC06\nXin nghỉ phép"];
+  UC24 [label="UC24\nTrạng thái hồ sơ,\nđóng tài khoản"];
+  UC25 [label="UC25\nXem thông báo"];
+ }
+ subgraph cluster_s { label="Actor phụ"; style="rounded"; color="#5b8f95"; node [shape=box, style="filled", fillcolor="#F4FBFC", color="#5b8f95"];
+  S1 [label="S1 Auth System"];
+  S2 [label="S2 API Gateway"];
+  S3 [label="S3 Doctor Verification"];
+  S6 [label="S6 Email SMTP"];
+  S7 [label="S7 Notification"];
+  S9 [label="S9 Event Bus"];
+  S10 [label="S10 Rule Engine"];
+ }
+ subgraph cluster_o { label="Actor offstage"; style="rounded,dashed"; color="#999999"; node [shape=box, style="dashed", color="#777777"];
+  O1 [label="O1 Sở Y tế / cơ quan cấp phép"];
+  O5 [label="O5 Nhà cung cấp email"];
+ }
+ P1 -> UC1;
+ P1 -> UC2;
+ P1 -> UC3;
+ P1 -> UC25;
+ P2 -> UC1;
+ P2 -> UC2;
+ P2 -> UC3;
+ P2 -> UC4;
+ P2 -> UC5;
+ P2 -> UC6;
+ P2 -> UC24;
+ P2 -> UC25;
+ UC1 -> S1;
+ UC1 -> S7;
+ UC2 -> S7;
+ UC2 -> S6;
+ UC3 -> S1;
+ UC3 -> S2;
+ UC4 -> S3;
+ UC5 -> S10;
+ UC5 -> S9;
+ UC6 -> S9;
+ UC25 -> S7;
+ O1 -> UC4 [style=dashed, color="#999999"];
+ O5 -> UC2 [style=dashed, color="#999999"];
+ UC1 -> UC2 [style=dashed, arrowhead=open, label="«include»", constraint=false];
+}

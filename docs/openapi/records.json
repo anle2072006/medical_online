@@ -1,0 +1,280 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SINA Clinic - Records Service",
+    "version": "1.0.0",
+    "description": "Benh an chuan FHIR, don thuoc dien tu, nhat ky truy cap. Moi loi tra ve dang { error: MA_LOI, message }."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "paths": {
+    "/api/records/drugs": {
+      "get": {
+        "summary": "Danh muc thuoc",
+        "tags": [
+          "Records Service"
+        ],
+        "operationId": "get_records__drugs",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: moi nguoi dung da dang nhap."
+      }
+    },
+    "/api/records/consultations/{appointmentId}/complete": {
+      "post": {
+        "summary": "Ket thuc buoi kham: ghi benh an (FHIR Encounter) va ke don (MedicationRequest)",
+        "tags": [
+          "Records Service"
+        ],
+        "operationId": "post_records__consultations_appointmentId_complete",
+        "parameters": [
+          {
+            "name": "appointmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "201 { recordId, prescription? }"
+          },
+          "201": {
+            "description": "201 { recordId, prescription? }"
+          },
+          "400": {
+            "description": "MISSING_FIELDS, UNKNOWN_DRUG, INVALID_FIELD"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          },
+          "403": {
+            "description": "FORBIDDEN"
+          },
+          "404": {
+            "description": "NOT_FOUND"
+          },
+          "409": {
+            "description": "NOT_IN_PROGRESS"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: doctor.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "symptoms": {
+                    "type": "string",
+                    "description": "string(<=2000)"
+                  },
+                  "diagnosis": {
+                    "type": "string",
+                    "description": "string(<=2000)"
+                  },
+                  "notes": {
+                    "type": "string",
+                    "description": "string?(<=4000)"
+                  },
+                  "items": {
+                    "type": "string",
+                    "description": "[{ drugId, dosage, quantity(1..999) }] (<=20)"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/records/records/mine": {
+      "get": {
+        "summary": "Benh an cua toi (kem FHIR va don thuoc)",
+        "tags": [
+          "Records Service"
+        ],
+        "operationId": "get_records__records_mine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          },
+          "403": {
+            "description": "FORBIDDEN"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: patient."
+      }
+    },
+    "/api/records/records/patient/{patientId}": {
+      "get": {
+        "summary": "Bac si xem benh an benh nhan co lich hen voi minh; moi lan xem ghi nhat ky",
+        "tags": [
+          "Records Service"
+        ],
+        "operationId": "get_records__records_patient_patientId",
+        "parameters": [
+          {
+            "name": "patientId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          },
+          "403": {
+            "description": "FORBIDDEN, NO_RELATIONSHIP"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: doctor."
+      }
+    },
+    "/api/records/access-logs/mine": {
+      "get": {
+        "summary": "Ai da xem hoac ghi benh an cua toi (50 gan nhat)",
+        "tags": [
+          "Records Service"
+        ],
+        "operationId": "get_records__access_logs_mine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          },
+          "403": {
+            "description": "FORBIDDEN"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: patient."
+      }
+    },
+    "/api/records/prescriptions/mine": {
+      "get": {
+        "summary": "Don thuoc dien tu cua toi",
+        "tags": [
+          "Records Service"
+        ],
+        "operationId": "get_records__prescriptions_mine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          },
+          "403": {
+            "description": "FORBIDDEN"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: patient."
+      }
+    },
+    "/api/records/prescriptions/{id}/collect": {
+      "post": {
+        "summary": "Danh dau da nhan thuoc o co so ban thuoc (ISSUED -> COLLECTED)",
+        "tags": [
+          "Records Service"
+        ],
+        "operationId": "post_records__prescriptions_id_collect",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          },
+          "403": {
+            "description": "FORBIDDEN"
+          },
+          "409": {
+            "description": "CANNOT_COLLECT"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: patient."
+      }
+    }
+  }
+}

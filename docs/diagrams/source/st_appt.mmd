@@ -1,0 +1,23 @@
+stateDiagram-v2
+  [*] --> pending: đặt lịch, giữ slot 15 phút
+  pending --> confirmed: payment.completed
+  pending --> failed: payment.failed
+  failed --> pending: thử thanh toán lại (tối đa 3)
+  failed --> confirmed: thanh toán thành công khi thử lại
+  pending --> failed: hết hạn giữ chỗ / hết 3 lượt (HOLD_EXPIRED)
+  pending --> cancelled: bệnh nhân hủy
+  failed --> cancelled: bệnh nhân hủy
+  confirmed --> cancelled: bệnh nhân / bác sĩ nghỉ / bác sĩ vắng / bác sĩ bị khóa
+  confirmed --> rescheduled: đổi lịch (đã giữ slot mới)
+  rescheduled --> confirmed: hoán đổi slot xong
+  confirmed --> in_progress: cả hai vào phòng
+  confirmed --> completed: ghi bệnh án
+  in_progress --> completed: bác sĩ ghi bệnh án
+  confirmed --> no_show: bệnh nhân vắng sau 15 phút
+  cancelled --> refunding: đã trả tiền và tỷ lệ > 0
+  refunding --> refunded: refund.completed
+  pending --> refunding: thanh toán đến muộn (hoàn 100%)
+  failed --> refunding: thanh toán đến muộn (hoàn 100%)
+  completed --> [*]
+  no_show --> [*]
+  refunded --> [*]

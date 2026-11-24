@@ -1,0 +1,28 @@
+sequenceDiagram
+  participant P as Bệnh nhân
+  participant D as Bác sĩ
+  participant TL as Tele
+  participant MQ as RabbitMQ
+  participant SC as Scheduling
+  participant RC as Records
+  participant NT as Notify
+  P->>TL: POST /sessions/{id}/join (qua Gateway)
+  TL->>TL: kiểm tra đúng người của lịch, chưa quá 10 phút trước giờ (production)
+  TL-->>P: roomUrl Jitsi riêng
+  D->>TL: POST /sessions/{id}/join
+  TL->>TL: cả hai đã vào: SCHEDULED → LIVE (claim nguyên tử)
+  TL-)MQ: consultation.started
+  TL-->>D: roomUrl Jitsi
+  MQ-)SC: confirmed → in_progress
+  MQ-)RC: cập nhật bản sao lịch
+  Note over P,D: Hai bên khám qua Jitsi Meet
+  D->>RC: POST /consultations/{id}/complete (triệu chứng, chẩn đoán, thuốc)
+  RC->>RC: in_progress → completed (claim nguyên tử, chỉ ghi một lần)
+  RC->>RC: tạo FHIR Encounter, đơn thuốc ISSUED mã RX-XXXXXX, ghi nhật ký truy cập
+  RC-)MQ: consultation.completed, prescription.issued
+  RC-->>D: 201 recordId, mã đơn
+  MQ-)SC: in_progress → completed, slot → DONE
+  MQ-)TL: phòng → ENDED
+  MQ-)NT: email bệnh án và đơn thuốc cho bệnh nhân
+  P->>RC: GET /records/mine, /prescriptions/mine
+  Note over P: Mang mã đơn đến cơ sở bán thuốc gần nhất rồi bấm "Tôi đã nhận thuốc" (ISSUED → COLLECTED)

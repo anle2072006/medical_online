@@ -1,0 +1,21 @@
+digraph G {
+  graph [rankdir=LR, fontname="DejaVu Sans", nodesep=0.4, ranksep=1.1, pad=0.3];
+  node [fontname="DejaVu Sans", fontsize=11, shape=record, style=filled, fillcolor="#E0F4F6", color="#0095A8"];
+  edge [fontname="DejaVu Sans", fontsize=9, color="#C9A227", style=dashed, fontcolor="#7a5c00"];
+  id [label="{identity_db|users (id)\ndoctors (user_id)\ndoctor_status_log\ndoctor_absences}"];
+  sc [label="{scheduling_db|doctors_cache (id)\nshifts, leaves, slots\nappointments (id)\nappointment_log}"];
+  bl [label="{billing_db|invoices\npayments\nrefunds\nprocessed_ipn}"];
+  rc [label="{records_db|appts (bản sao)\nrecords, prescriptions\ndrugs, access_logs}"];
+  tl [label="{tele_db|sessions}"];
+  nt [label="{notify_db|users (bản sao)\nnotifications\nreminders}"];
+  sc -> id [label="patient_id, doctor_id"];
+  bl -> sc [label="appointment_id"];
+  bl -> id [label="patient_id"];
+  rc -> sc [label="appointment_id"];
+  rc -> id [label="patient_id, doctor_id"];
+  tl -> sc [label="appointment_id"];
+  tl -> id [label="patient_id, doctor_id"];
+  nt -> id [label="user_id"];
+  nt -> sc [label="appointment_id (reminders)"];
+  sc -> id [label="doctors_cache.id ← sự kiện doctor.*", style=dotted];
+}

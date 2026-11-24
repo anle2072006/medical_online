@@ -1,0 +1,51 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SINA Clinic - Billing Service",
+    "version": "1.0.0",
+    "description": "Hoa don, thanh toan VNPay (sandbox), webhook idempotent, hoan tien. Moi loi tra ve dang { error: MA_LOI, message }."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "paths": {
+    "/api/billing/invoices": {
+      "get": {
+        "summary": "Hoa don cua toi, loc ?appointmentId=; kem payUrl cua lan thanh toan hien tai",
+        "tags": [
+          "Billing Service"
+        ],
+        "operationId": "get_billing__invoices",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          },
+          "403": {
+            "description": "FORBIDDEN"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: patient."
+      }
+    }
+  }
+}

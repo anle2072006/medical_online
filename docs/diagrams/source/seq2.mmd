@@ -1,0 +1,22 @@
+sequenceDiagram
+  participant D as Bác sĩ
+  participant GW as Gateway
+  participant SC as Scheduling
+  participant RE as Rule Engine (common/rules.js)
+  participant MQ as RabbitMQ
+  D->>GW: POST /shifts (thứ, giờ, độ dài slot, phí)
+  GW->>SC: chuyển tiếp kèm JWT
+  SC->>SC: lưu ca SUBMITTED
+  SC->>RE: checkShiftRules(trạng thái bác sĩ, ca, các ca cùng thứ)
+  alt vi phạm một trong 5 luật
+    RE-->>SC: mã lý do (DOCTOR_NOT_VERIFIED, OUT_OF_HOURS, SHIFT_OVERLAP, OVER_LIMIT, TOO_LATE)
+    SC->>SC: ca → REJECTED
+    SC-->>D: 201 REJECTED + rejectCode + lời giải thích
+  else đạt cả 5 luật
+    RE-->>SC: null
+    SC->>SC: ca → APPROVED
+    SC-)MQ: shift.approved
+    SC-->>D: 201 APPROVED
+    MQ-)SC: shift.approved
+    SC->>SC: sinh slot 30 ngày tới (bỏ qua ngày nghỉ phép, insertIgnore chống trùng)
+  end

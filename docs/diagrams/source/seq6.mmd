@@ -1,0 +1,27 @@
+sequenceDiagram
+  participant TL as Tele (job mỗi 10 giây)
+  participant MQ as RabbitMQ
+  participant SC as Scheduling
+  participant BL as Billing
+  participant ID as Identity
+  participant NT as Notify
+  TL->>TL: phiên SCHEDULED quá 15 phút kể từ giờ hẹn
+  TL->>TL: claim SCHEDULED → MISSED (chỉ một lần)
+  alt bác sĩ chưa vào phòng
+    TL-)MQ: doctor.absent
+    MQ-)SC: hủy lịch bởi DOCTOR, hoàn 100%, slot → BLOCKED
+    SC-)MQ: appointment.cancelled, refund.requested
+    MQ-)BL: hoàn tiền 100% (Saga như luồng hủy)
+    MQ-)ID: ghi vắng mặt (unique theo lịch)
+    ID->>ID: đếm vắng mặt trong 30 ngày
+    opt đủ 3 lần
+      ID->>ID: active → suspended (ABSENCE), hạn 7 ngày
+      ID-)MQ: doctor.suspended
+      MQ-)SC: khóa slot trống, hủy các lịch sắp tới và hoàn tiền
+    end
+    MQ-)NT: báo bệnh nhân được hoàn 100%
+  else bác sĩ đã vào, bệnh nhân vắng
+    TL-)MQ: patient.no_show
+    MQ-)SC: confirmed → no_show, slot → DONE (không hoàn phí)
+    MQ-)NT: báo bệnh nhân đã vắng buổi khám
+  end

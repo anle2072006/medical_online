@@ -1,0 +1,12 @@
+stateDiagram-v2
+  [*] --> AVAILABLE: sinh slot từ ca đã duyệt
+  AVAILABLE --> HELD: giữ chỗ (version + 1)
+  HELD --> BOOKED: thanh toán thành công
+  HELD --> AVAILABLE: hết hạn giữ chỗ / hủy / hết lượt thanh toán
+  AVAILABLE --> BOOKED: đổi lịch sang slot này
+  BOOKED --> AVAILABLE: hủy lịch bởi bệnh nhân / đổi sang slot khác
+  BOOKED --> DONE: khám xong hoặc bệnh nhân vắng
+  AVAILABLE --> BLOCKED: bác sĩ nghỉ phép / bị khóa
+  BOOKED --> BLOCKED: bác sĩ hủy hoặc vắng mặt
+  BLOCKED --> AVAILABLE: bác sĩ hoạt động lại (DOCTOR_STATUS)
+  DONE --> [*]

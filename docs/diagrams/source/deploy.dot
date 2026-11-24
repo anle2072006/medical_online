@@ -1,0 +1,27 @@
+digraph G {
+  graph [rankdir=TB, fontname="DejaVu Sans", nodesep=0.3, ranksep=0.6, pad=0.3, compound=true];
+  node [fontname="DejaVu Sans", fontsize=11, shape=box, style="rounded,filled", fillcolor="#E0F4F6", color="#0095A8"];
+  edge [fontname="DejaVu Sans", fontsize=10, color="#005162"];
+  user [label="Người dùng\n(trình duyệt)", fillcolor="white"];
+  subgraph cluster_host { label="Máy chủ dự án (Docker Compose, mạng nội bộ mặc định)"; style="rounded"; color="#00404F"; fontsize=12;
+    subgraph cluster_img { label="image sina-clinic (node:22-slim, USER node, npm ci) · cùng một image, khác lệnh chạy"; style="rounded,dashed"; color="#5b8f95"; fontsize=10;
+      gw [label="gateway\n:8080 (mở ra ngoài)", fillcolor="#0095A8", fontcolor=white];
+      id [label="identity :3001"]; sc [label="scheduling :3002"]; bl [label="billing :3003"];
+      rc [label="records :3004"]; tl [label="tele :3005"]; nt [label="notify :3006"]; mk [label="mock-externals :4000"];
+    }
+    mq [label="rabbitmq:3.13-management\n5672 (nội bộ) · 15673→15672 (UI)", fillcolor="#FFF6D6", color="#C9A227"];
+    mg [label="mongo:7\n27017 (nội bộ) · 27030→27017", fillcolor="#F4FBFC"];
+    vol [label="volume mongo-data\n(/data/db)", shape=cylinder, fillcolor="#F4FBFC"];
+  }
+  ext [label="Internet: SMTP (Gmail/Mailtrap),\nmeet.jit.si, cdnjs (Swagger UI)", fillcolor="white", color="#C9A227"];
+  user -> gw [label="HTTP 8080"];
+  gw -> {id sc bl rc tl nt} [label=" REST", fontsize=9];
+  {id sc bl rc tl nt} -> mq [style=dashed, dir=both];
+  {id sc bl rc tl nt} -> mg;
+  mg -> vol;
+  nt -> ext [label="SMTP 587"];
+  user -> mq [label="UI 15673", style=dotted];
+  user -> mg [label="27030 (seed, Compass)", style=dotted];
+  user -> ext [style=dotted];
+  gw -> mk [style=dotted];
+}

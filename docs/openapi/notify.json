@@ -1,0 +1,72 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SINA Clinic - Notification Service",
+    "version": "1.0.0",
+    "description": "Thong bao trong ung dung, email (retry 3 lan), nhac lich 24h va 1h. Moi loi tra ve dang { error: MA_LOI, message }."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "paths": {
+    "/api/notify/notifications/mine": {
+      "get": {
+        "summary": "Thong bao cua toi + so chua doc (phan trang ?page=&limit=)",
+        "tags": [
+          "Notification Service"
+        ],
+        "operationId": "get_notify__notifications_mine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: moi nguoi dung da dang nhap."
+      }
+    },
+    "/api/notify/notifications/read-all": {
+      "post": {
+        "summary": "Danh dau da doc tat ca",
+        "tags": [
+          "Notification Service"
+        ],
+        "operationId": "post_notify__notifications_read_all",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Thanh cong"
+          },
+          "401": {
+            "description": "UNAUTHORIZED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Vai tro: moi nguoi dung da dang nhap."
+      }
+    }
+  }
+}
