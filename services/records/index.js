@@ -39,6 +39,9 @@ async function main() {
     if (a.status !== 'in_progress') throw new HttpError(409, 'NOT_IN_PROGRESS', 'Chỉ ghi bệnh án khi buổi khám đang diễn ra (cả hai đã vào phòng).');
     const { symptoms, diagnosis, notes, items = [] } = req.body || {};
     if (!symptoms || !diagnosis) throw new HttpError(400, 'MISSING_FIELDS', 'Cần nhập triệu chứng và chẩn đoán.');
+    C.str(symptoms, 'symptoms', { min: 1, max: 2000 }); C.str(diagnosis, 'diagnosis', { min: 1, max: 2000 }); if (notes != null) C.str(notes, 'notes', { max: 4000 });
+    if (!Array.isArray(items) || items.length > 20) throw new HttpError(400, 'INVALID_FIELD', 'Đơn thuốc tối đa 20 loại thuốc.');
+    for (const it of items) { if (it == null || typeof it !== 'object') throw new HttpError(400, 'INVALID_FIELD', 'Dòng thuốc không hợp lệ.'); if (it.dosage != null) C.str(it.dosage, 'dosage', { max: 200 }); if (it.quantity != null && !(Number(it.quantity) >= 0 && Number(it.quantity) <= 999)) throw new HttpError(400, 'INVALID_FIELD', 'Số lượng thuốc phải từ 1 đến 999.'); }
     const ids = [...new Set(items.map((i) => Number(i.drugId)))];
     const found = ids.length ? await drugs.all({ id: { $in: ids } }) : [];
     if (found.length !== ids.length) throw new HttpError(400, 'UNKNOWN_DRUG', 'Thuốc không có trong danh mục.');

@@ -1,11 +1,24 @@
 'use strict';
 // Identity (identity_db, MongoDB): dang ky/dang nhap, ho so benh nhan & bac si, FSM ho so bac si (tu dong xac thuc qua Doctor Verification).
+const crypto = require('node:crypto');
 const bcrypt = require('bcryptjs');
 const C = require('../../common');
 const { CONFIG, uid, nowIso, HttpError, wrap, auth, internalOnly, callJson, log } = C;
 
 const SPECIALTIES = ['Nội tổng quát', 'Nhi khoa', 'Da liễu', 'Tim mạch', 'Tai mũi họng', 'Thần kinh', 'Mắt', 'Răng hàm mặt'];
 let bus, users, doctors, statusLog, absences;
+
+// ----- Xac minh email bang OTP 6 so (B1): het han 10 phut, toi da 5 lan nhap sai, gui lai moi 60 giay -----
+const OTP_TTL_MS = 10 * 60000, OTP_MAX_TRIES = 5, OTP_RESEND_MS = 60000;
+const otpHash = (userId, otp) => crypto.createHmac('sha256', CONFIG.jwtSecret).update(`${userId}:${otp}`).digest('hex');
+const sameHash = (a, b) => a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+async function issueOtp(u) {
+  const otp = String(crypto.randomInt(100000, 1000000));
+  await users.set({ id: u.id }, { otp_hash: otpHash(u.id, otp), otp_expires: new Date(Date.now() + OTP_TTL_MS).toISOString(), otp_tries: 0, otp_sent_at: Date.now() });
+  bus.publish('user.otp_issued', { userId: u.id, email: u.email, fullName: u.full_name, otp });
+  return otp;
+}
+const unverified = (u) => u.verified === false; // tai khoan cu (khong co truong verified) coi nhu da xac minh
 
 async function setDoctorStatus(doctorId, to, reason, event, extra = {}) {
   const d = await doctors.get({ user_id: doctorId });
@@ -73,27 +86,67 @@ async function main() {
   app.post('/register', wrap(async (req, res) => {
     const { role, email, password, fullName, specialty, licenseNo, phone, dob } = req.body || {};
     if (!['patient', 'doctor'].includes(role)) throw new HttpError(400, 'INVALID_ROLE', 'Vai trò không hợp lệ.');
-    if (!email || !/^\S+@\S+\.\S+$/.test(email)) throw new HttpError(400, 'INVALID_EMAIL', 'Email không hợp lệ.');
-    if (!password || password.length < 6) throw new HttpError(400, 'WEAK_PASSWORD', 'Mật khẩu cần ít nhất 6 ký tự.');
-    if (!fullName) throw new HttpError(400, 'MISSING_NAME', 'Vui lòng nhập họ tên.');
+    C.email(email);
+    if (typeof password !== 'string' || password.length < 6) throw new HttpError(400, 'WEAK_PASSWORD', 'Mật khẩu cần ít nhất 6 ký tự.');
+    C.str(password, 'password', { min: 6, max: 72 }); // bcrypt chi dung 72 byte dau
+    C.str(fullName, 'fullName', { min: 1, max: 100 });
+    if (phone != null) C.str(phone, 'phone', { max: 20 });
+    if (dob != null) C.str(dob, 'dob', { max: 10 });
+    if (role === 'doctor') { C.str(licenseNo, 'licenseNo', { min: 1, max: 30 }); }
     if (role === 'doctor' && (!SPECIALTIES.includes(specialty) || !licenseNo)) throw new HttpError(400, 'MISSING_DOCTOR_INFO', 'Bác sĩ cần chọn chuyên khoa và nhập số giấy phép.');
-    const id = uid();
-    const ok = await users.insertIgnore({ id, email: email.toLowerCase(), password_hash: bcrypt.hashSync(password, 8), role, full_name: fullName, phone: phone || null, dob: dob || null, created_at: nowIso() });
+    const id = uid(); const mail = email.toLowerCase();
+    const row = { id, email: mail, password_hash: bcrypt.hashSync(password, 8), role, full_name: fullName, phone: phone || null, dob: dob || null, verified: false, created_at: nowIso() };
+    let ok = await users.insertIgnore(row);
+    if (!ok) { // email da co: neu tai khoan cu chua xac minh thi cho dang ky lai (nguoi that so huu email co the lay lai email)
+      const old = await users.get({ email: mail });
+      if (old && unverified(old)) { await users.del({ id: old.id }); await doctors.del({ user_id: old.id }); ok = await users.insertIgnore(row); }
+    }
     if (!ok) throw new HttpError(409, 'EMAIL_TAKEN', 'Email này đã được đăng ký.');
-    bus.publish('user.registered', { userId: id, email: email.toLowerCase(), fullName, role });
     if (role === 'doctor') {
       await doctors.insert({ user_id: id, specialty, license_no: licenseNo, license_expiry: null, status: 'registered', reason: null, verify_attempts: 1, suspended_until: null });
       await statusLog.insert({ doctor_id: id, from_status: 'start', to_status: 'registered', reason: null, at: nowIso() });
-      bus.publish('doctor.registered', { doctorId: id, fullName, specialty, licenseNo });
     }
-    res.status(201).json({ id, role });
+    const otp = await issueOtp({ id, email: mail, full_name: fullName });
+    const out = { id, role, verificationRequired: true, expiresInMinutes: OTP_TTL_MS / 60000 };
+    if (process.env.EXPOSE_DEV_OTP === 'true') out.devOtp = otp; // chi de kiem thu tu dong, mac dinh tat
+    res.status(201).json(out);
+  }));
+
+  // Nhap OTP: dung thi kich hoat tai khoan, phat su kien dang ky (chao mung, bat dau xac thuc giay phep bac si) va dang nhap luon.
+  app.post('/verify-email', wrap(async (req, res) => {
+    const { email, otp } = req.body || {};
+    C.email(email); C.str(otp, 'otp', { min: 6, max: 6 });
+    const u = await users.get({ email: email.toLowerCase() });
+    if (!u || !unverified(u)) throw new HttpError(400, 'BAD_OTP', 'Mã OTP không đúng hoặc đã hết hạn.');
+    if (!u.otp_hash || u.otp_expires < nowIso()) throw new HttpError(400, 'OTP_EXPIRED', 'Mã OTP đã hết hạn, hãy bấm gửi lại mã.');
+    if (u.otp_tries >= OTP_MAX_TRIES) throw new HttpError(429, 'OTP_LOCKED', 'Nhập sai quá 5 lần. Hãy bấm gửi lại mã mới.');
+    await users.update({ id: u.id }, { $inc: { otp_tries: 1 } });
+    if (!sameHash(otpHash(u.id, otp), u.otp_hash)) throw new HttpError(400, 'BAD_OTP', 'Mã OTP chưa đúng.');
+    // Chuyen verified false -> true nguyen tu: chi mot yeu cau thanh cong duoc phat su kien
+    const claimed = await users.claim({ id: u.id, verified: false }, { $set: { verified: true, otp_hash: null, otp_expires: null } });
+    if (claimed) {
+      bus.publish('user.registered', { userId: u.id, email: u.email, fullName: u.full_name, role: u.role });
+      if (u.role === 'doctor') { const d = await doctors.get({ user_id: u.id }); bus.publish('doctor.registered', { doctorId: u.id, fullName: u.full_name, specialty: d.specialty, licenseNo: d.license_no }); }
+    }
+    res.json({ token: C.signToken(u), user: { id: u.id, role: u.role, fullName: u.full_name, email: u.email } });
+  }));
+
+  app.post('/resend-otp', wrap(async (req, res) => {
+    const { email } = req.body || {}; C.email(email);
+    const u = await users.get({ email: email.toLowerCase() });
+    if (u && unverified(u)) {
+      if (u.otp_sent_at && Date.now() - u.otp_sent_at < OTP_RESEND_MS) throw new HttpError(429, 'OTP_TOO_SOON', 'Vui lòng đợi 60 giây trước khi gửi lại mã.');
+      await issueOtp(u);
+    }
+    res.json({ ok: true }); // luon tra ve ok de khong lo email nao da dang ky
   }));
 
   app.post('/login', wrap(async (req, res) => {
     const { email = '', password = '' } = req.body || {};
-    if (typeof email !== 'string' || typeof password !== 'string') throw new HttpError(400, 'INVALID_FIELD', 'Email hoặc mật khẩu không hợp lệ.');
+    if (typeof email !== 'string' || typeof password !== 'string' || email.length > 120 || password.length > 72) throw new HttpError(400, 'INVALID_FIELD', 'Email hoặc mật khẩu không hợp lệ.');
     const u = await users.get({ email: email.toLowerCase() });
     if (!u || !bcrypt.compareSync(password, u.password_hash)) throw new HttpError(401, 'BAD_CREDENTIALS', 'Email hoặc mật khẩu chưa đúng.');
+    if (unverified(u)) throw new HttpError(403, 'EMAIL_NOT_VERIFIED', 'Email chưa được xác minh. Hãy nhập mã OTP đã gửi về email của bạn.');
     if (u.role === 'doctor' && (await doctors.get({ user_id: u.id })).status === 'deactivated') throw new HttpError(403, 'ACCOUNT_CLOSED', 'Tài khoản bác sĩ đã đóng.');
     res.json({ token: C.signToken(u), user: { id: u.id, role: u.role, fullName: u.full_name, email: u.email } });
   }));
@@ -123,7 +176,7 @@ async function main() {
     const d = await doctors.get({ user_id: req.user.id });
     if (d.status !== 'rejected') throw new HttpError(409, 'NOT_REJECTED', 'Hồ sơ không ở trạng thái bị từ chối.');
     if (d.verify_attempts >= 3) throw new HttpError(409, 'NO_RETRIES_LEFT', 'Đã hết 3 lần nộp lại.');
-    const licenseNo = (req.body && req.body.licenseNo) || d.license_no;
+    const licenseNo = (req.body && req.body.licenseNo) ? C.str(req.body.licenseNo, 'licenseNo', { min: 1, max: 30 }) : d.license_no;
     await doctors.update({ user_id: req.user.id }, { $set: { license_no: licenseNo }, $inc: { verify_attempts: 1 } });
     await setDoctorStatus(req.user.id, 'registered', 'RESUBMITTED', null);
     bus.publish('doctor.registered', { doctorId: req.user.id, fullName: req.user.name, specialty: d.specialty, licenseNo });
@@ -152,7 +205,7 @@ async function main() {
 
   app.get('/internal/users/:id', internalOnly, wrap(async (req, res) => { const u = await users.get({ id: req.params.id }, { projection: { _id: 0, id: 1, full_name: 1, email: 1, role: 1 } }); u ? res.json(u) : res.status(404).json({}); }));
 
-  for (const d of await doctors.all({ status: { $in: ['registered', 'verifying'] } })) { await setDoctorStatus(d.user_id, 'verifying', null, null); verifyLoop(d.user_id); }
+  for (const d of await doctors.all({ status: { $in: ['registered', 'verifying'] } })) { const u = await users.get({ id: d.user_id }); if (!u || unverified(u)) continue; await setDoctorStatus(d.user_id, 'verifying', null, null); verifyLoop(d.user_id); }
   setInterval(() => periodicCheck().catch(() => {}), Number(process.env.LICENSE_CHECK_MS || 86400000));
   C.finish(app, 'identity', 3001);
 }

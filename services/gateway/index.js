@@ -5,8 +5,12 @@ const C = require('../../common');
 const { CONFIG, auth, wrap } = C;
 
 const ROUTES = { identity: CONFIG.urls.identity, scheduling: CONFIG.urls.scheduling, billing: CONFIG.urls.billing, records: CONFIG.urls.records, tele: CONFIG.urls.tele, notify: CONFIG.urls.notify };
-const PUBLIC = [['POST', '/api/identity/register'], ['POST', '/api/identity/login'], ['GET', '/api/identity/specialties']];
-const hits = new Map();
+const PUBLIC = [['POST', '/api/identity/register'], ['POST', '/api/identity/login'], ['GET', '/api/identity/specialties'], ['POST', '/api/identity/verify-email'], ['POST', '/api/identity/resend-otp']];
+const hits = new Map();      // dem chung: 300 yeu cau/phut/IP
+const authHits = new Map();  // dem rieng cho dang nhap/dang ky: 20 lan/phut/IP
+const AUTH_PATHS = ['/api/identity/login', '/api/identity/register', '/api/identity/verify-email', '/api/identity/resend-otp'];
+// Don bo nho dem moi 60 giay: bo cac dia chi khong con yeu cau trong 1 phut gan day.
+setInterval(() => { const now = Date.now(); for (const m of [hits, authHits]) for (const [k, v] of m) if (!v.length || now - v[v.length - 1] > 60000) m.delete(k); }, 60000).unref();
 
 // Duong dan noi bo chi cac service goi nhau, khong bao gio duoc lo ra ngoai (khong phan biet hoa thuong).
 const BLOCKED = /(^|\/)(internal|webhooks)(\/|$)/i;
@@ -22,11 +26,21 @@ app.use((req, res, next) => { // gioi han 300 yeu cau moi phut moi dia chi
   if (h.length > 300) return res.status(429).json({ error: 'RATE_LIMITED', message: 'Bạn thao tác quá nhanh, vui lòng thử lại sau ít phút.' });
   next();
 });
-app.use(C.express.json({ limit: '1mb' }));
+app.use((req, res, next) => { // request-id xuyen suot: gateway sinh, moi service ghi vao log
+  req.id = (typeof req.headers['x-request-id'] === 'string' && /^[\w-]{8,64}$/.test(req.headers['x-request-id'])) ? req.headers['x-request-id'] : C.uid();
+  res.setHeader('x-request-id', req.id); next();
+});
+app.use((req, res, next) => { // gioi han rieng dang nhap/dang ky chong do mat khau
+  if (req.method !== 'POST' || !AUTH_PATHS.includes(req.path)) return next();
+  const now = Date.now(); const h = (authHits.get(req.ip) || []).filter((t) => now - t < 60000); h.push(now); authHits.set(req.ip, h);
+  if (h.length > 20) return res.status(429).json({ error: 'RATE_LIMITED', message: 'Bạn thử đăng nhập/đăng ký quá nhiều lần, vui lòng đợi 1 phút.' });
+  next();
+});
+app.use(C.express.json({ limit: '100kb' }));
 
 async function forward(req, res, base, rest) {
   const url = `${base}${rest}`;
-  const headers = { 'content-type': 'application/json' };
+  const headers = { 'content-type': 'application/json', 'x-request-id': req.id };
   if (req.headers.authorization) headers.authorization = req.headers.authorization;
   try {
     const r = await fetch(url, { method: req.method, headers, body: ['GET', 'HEAD'].includes(req.method) ? undefined : JSON.stringify(req.body || {}), signal: AbortSignal.timeout(10000) });
@@ -59,6 +73,12 @@ app.all('/api/:service/*', (req, res, next) => {
   auth()(req, res, () => forward(req, res, base, rest)); // kiem tra JWT o gateway, moi service kiem tra lai
 });
 
+// Tai lieu API (B2): Swagger UI tai /docs, dac ta OpenAPI 3 cua tung service tai /docs/openapi/<service>.json (sinh bang: node scripts/build-openapi.js)
+app.use('/docs/openapi', C.express.static(path.join(__dirname, '..', '..', 'docs', 'openapi')));
+app.get('/docs', (req, res) => res.type('html').send(`<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>SINA Clinic API</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.17.14/swagger-ui.min.css"></head>
+<body><div id="ui"></div><script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.17.14/swagger-ui-bundle.min.js"></script>
+<script>fetch('/docs/openapi/index.json').then((r) => r.json()).then((urls) => SwaggerUIBundle({ urls, dom_id: '#ui', persistAuthorization: true, tryItOutEnabled: true }));</script></body></html>`));
 app.use(C.express.static(path.join(__dirname, '..', '..', 'frontend')));
 C.finish(app, 'gateway', Number(process.env.PORT || 8080));
 

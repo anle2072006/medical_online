@@ -55,6 +55,20 @@ const str = (v, name, { min = 0, max = 200 } = {}) => {
   return v;
 };
 
+// Email hop le va khong qua dai (chan 'a@b@c.d').
+const email = (v, name = 'email') => {
+  if (typeof v !== 'string' || v.length > 120 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) throw new HttpError(400, 'INVALID_EMAIL', 'Email không hợp lệ.');
+  return v;
+};
+
+// Phan trang (B11): ?page=1&limit=20 (toi da 100). Tra them header X-Total-Count, X-Page, X-Total-Pages de client biet con trang sau hay khong.
+const pageOf = (req, defLimit = 20) => {
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || defLimit));
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  return { page, limit, skip: (page - 1) * limit };
+};
+const pageHeaders = (res, { page, limit }, total) => { res.set({ 'X-Total-Count': String(total), 'X-Page': String(page), 'X-Total-Pages': String(Math.max(1, Math.ceil(total / limit))), 'Access-Control-Expose-Headers': 'X-Total-Count, X-Page, X-Total-Pages' }); };
+
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 function log(service, ...a) { console.log(`[${service}]`, ...a); }
@@ -66,7 +80,7 @@ function wrapCol(c) {
   return {
     raw: c,
     get: (f = {}, o = {}) => c.findOne(f, { ...P, ...o }),
-    all: async (f = {}, { sort, limit } = {}) => { let q = c.find(f, P); if (sort) q = q.sort(sort); if (limit) q = q.limit(limit); return q.toArray(); },
+    all: async (f = {}, { sort, limit, skip } = {}) => { let q = c.find(f, P); if (sort) q = q.sort(sort); if (skip) q = q.skip(skip); if (limit) q = q.limit(limit); return q.toArray(); },
     count: (f = {}) => c.countDocuments(f),
     insert: (d) => c.insertOne({ ...d }),
     insertIgnore: async (d) => { try { await c.insertOne({ ...d }); return true; } catch (e) { if (e.code === 11000) return false; throw e; } }, // trung khoa duy nhat -> false
@@ -101,7 +115,12 @@ async function connectBus(service) {
     try { conn = await amqp.connect(url); break; }
     catch (e) { if (i > 60) throw e; log(service, 'cho RabbitMQ...'); await sleep(2000); }
   }
+  // Mat ket noi RabbitMQ: thoat tien trinh de Docker (restart: unless-stopped) khoi dong lai va noi lai tu dau.
+  const die = (why) => (e) => { log(service, `RabbitMQ ${why}${e && e.message ? ': ' + e.message : ''}. Thoat de Docker khoi dong lai.`); process.exit(1); };
+  conn.on('error', (e) => log(service, 'loi ket noi RabbitMQ:', e.message));
+  conn.on('close', die('dong ket noi'));
   const ch = await conn.createChannel();
+  ch.on('error', die('loi kenh'));
   await ch.assertExchange('clinic.events', 'topic', { durable: true });
   await ch.assertExchange('clinic.dlx', 'topic', { durable: true });
   const handlers = {};
@@ -166,7 +185,11 @@ async function callJson(url, { method = 'GET', body, headers = {}, timeout = 500
 
 function createApp(service) {
   const app = express();
-  app.use(express.json({ limit: '1mb' }));
+  app.use((req, res, next) => { // ghi request-id cua gateway vao log de truy vet qua nhieu service
+    const rid = req.headers['x-request-id']; if (rid && req.method !== 'GET') log(service, `[${rid}] ${req.method} ${req.path}`);
+    next();
+  });
+  app.use(express.json({ limit: '100kb' }));
   app.get('/health', (req, res) => res.json({ service, ok: true, at: nowIso() }));
   return app;
 }
@@ -174,10 +197,12 @@ function finish(app, service, port) {
   app.use((req, res) => res.status(404).json({ error: 'NOT_FOUND' }));
   app.use((err, req, res, next) => { // eslint-disable-line
     if (err instanceof HttpError) return res.status(err.status).json({ error: err.code, message: err.message });
+    if (err.type === 'entity.too.large') return res.status(413).json({ error: 'PAYLOAD_TOO_LARGE', message: 'Dữ liệu gửi lên quá lớn (tối đa 100KB).' });
+    if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'BAD_JSON', message: 'Nội dung gửi lên không phải JSON hợp lệ.' });
     log(service, 'loi:', err.stack || err.message);
     res.status(500).json({ error: 'INTERNAL', message: 'Có lỗi hệ thống, vui lòng thử lại.' });
   });
   app.listen(port, () => log(service, `dang chay o cong ${port}`));
 }
 
-module.exports = { CONFIG,str, uid, nowIso, sleep, pad, ymd, addDays, toMin, fromMin, localDate, sign, HttpError, wrap, log, openDb, connectBus, signToken, auth, internalOnly, callJson, createApp, finish, express };
+module.exports = { CONFIG, str, email, pageOf, pageHeaders, uid, nowIso, sleep, pad, ymd, addDays, toMin, fromMin, localDate, sign, HttpError, wrap, log, openDb, connectBus, signToken, auth, internalOnly, callJson, createApp, finish, express };
