@@ -2,6 +2,7 @@
 // Scheduling (scheduling_db, MongoDB): tu duyet ca lam viec, sinh slot, nghi phep, dat/huy/doi lich, FSM lich hen.
 // Khong dung giao dich da tai lieu: moi buoc la mot cap nhat nguyen tu tren mot document (claim/optimistic lock).
 const C = require('../../common');
+const R = require('../../common/rules');
 const { CONFIG, uid, nowIso, ymd, addDays, toMin, fromMin, localDate, HttpError, wrap, auth, internalOnly, log } = C;
 
 let bus, doctorsCache, shifts, leaves, slots, appts, apptLog;
@@ -19,7 +20,7 @@ async function transition(id, from, to, reason, patch = {}, inc) {
 const apptEvent = (a, extra = {}) => ({ appointmentId: a.id, slotId: a.slot_id, patientId: a.patient_id, patientName: a.patient_name, doctorId: a.doctor_id, doctorName: a.doctor_name, date: a.date, start: a.start, fee: a.fee, ...extra });
 const apptView = (a) => ({ id: a.id, status: a.status, date: a.date, start: a.start, doctorId: a.doctor_id, doctorName: a.doctor_name, specialty: a.specialty, patientId: a.patient_id, patientName: a.patient_name, fee: a.fee, expiresAt: a.expires_at, retryCount: a.retry_count, cancelledBy: a.cancelled_by || null, refundPercent: a.refund_percent ?? null, visitType: 'ONLINE' });
 const slotView = (s) => ({ id: s.id, date: s.date, start: s.start, endTime: s.end_time, fee: s.fee, version: s.version });
-const refundPercentFor = (a) => { const h = (localDate(a.date, a.start) - Date.now()) / 36e5; return h >= 24 ? 100 : h >= 2 ? 50 : 0; };
+const refundPercentFor = (a) => R.refundPercent(localDate(a.date, a.start));
 const releaseSlot = (slotId, to = 'AVAILABLE', reason = null) => slots.update({ id: slotId }, { $set: { status: to, block_reason: reason, hold_appt: null }, $inc: { version: 1 } });
 const upcomingFilter = (today, nowT) => ({ $or: [{ date: { $gt: today } }, { date: today, start: { $gt: nowT } }] });
 
@@ -43,21 +44,10 @@ async function generateForShift(s) {
 }
 const generateAll = async () => { for (const s of await shifts.all({ status: 'APPROVED' })) await generateForShift(s); };
 
-function firstOccurrence(b) {
-  const d = new Date(`${b.startDate}T00:00:00`);
-  while (d.getDay() !== b.weekday) d.setDate(d.getDate() + 1);
-  return localDate(ymd(d), b.startTime);
-}
 async function checkShiftRules(doctorId, b) {
   const doc = await doctorsCache.get({ id: doctorId });
-  if (!doc || doc.status !== 'active') return 'DOCTOR_NOT_VERIFIED';
-  if (b.startTime < '07:00' || b.endTime > '20:00' || b.startTime >= b.endTime) return 'OUT_OF_HOURS';
-  const same = await shifts.all({ doctor_id: doctorId, weekday: b.weekday, status: 'APPROVED' });
-  if (same.some((s) => b.startTime < s.end_time && s.start_time < b.endTime)) return 'SHIFT_OVERLAP';
-  const total = same.reduce((m, s) => m + toMin(s.end_time) - toMin(s.start_time), 0) + toMin(b.endTime) - toMin(b.startTime);
-  if (total > 480) return 'OVER_LIMIT';
-  if (firstOccurrence(b) - Date.now() < 24 * 36e5) return 'TOO_LATE';
-  return null;
+  const sameDay = await shifts.all({ doctor_id: doctorId, weekday: b.weekday, status: 'APPROVED' });
+  return R.checkShiftRules({ doctorStatus: doc && doc.status, shift: b, sameDay });
 }
 const REJECT_TEXT = {
   DOCTOR_NOT_VERIFIED: 'Hồ sơ bác sĩ chưa được xác thực hoặc giấy phép không còn hiệu lực.', OUT_OF_HOURS: 'Ca nằm ngoài giờ hoạt động 07:00 đến 20:00.',
@@ -176,7 +166,7 @@ async function main() {
     const doc = await doctorsCache.get({ id: slot.doctor_id });
     const id = uid(); const expires = new Date(Date.now() + CONFIG.holdMinutes * 6e4).toISOString();
     // Optimistic locking: chi giu cho khi slot con AVAILABLE dung version da doc. Nguoi den sau khong khop dieu kien nen bi tu choi.
-    if (!(await slots.update({ id: slot.id, status: 'AVAILABLE', version: slot.version }, { $set: { status: 'HELD', hold_appt: id }, $inc: { version: 1 } }))) throw new HttpError(409, 'SLOT_TAKEN', 'Khung giờ này vừa có người đặt. Vui lòng chọn khung giờ khác.');
+    if (!(await R.holdSlot(slots, slot, id))) throw new HttpError(409, 'SLOT_TAKEN', 'Khung giờ này vừa có người đặt. Vui lòng chọn khung giờ khác.');
     const appt = { id, slot_id: slot.id, patient_id: req.user.id, patient_name: req.user.name, doctor_id: slot.doctor_id, doctor_name: doc.full_name, specialty: doc.specialty, date: slot.date, start: slot.start, fee: slot.fee, status: 'pending', expires_at: expires, retry_count: 0, cancelled_by: null, refund_percent: null, released: false, created_at: nowIso() };
     try { await appts.insert(appt); await apptLog.insert({ appointment_id: id, from_status: 'start', to_status: 'pending', reason: 'SLOT_HELD', at: nowIso() }); }
     catch (e) { await releaseSlot(slot.id); throw e; } // buoc bu tru: tra slot neu khong tao duoc lich
@@ -186,7 +176,9 @@ async function main() {
 
   app.get('/appointments/mine', auth(), wrap(async (req, res) => {
     const col = req.user.role === 'doctor' ? 'doctor_id' : 'patient_id';
-    res.json((await appts.all({ [col]: req.user.id }, { sort: { date: -1, start: -1 } })).map(apptView));
+    const pg = C.pageOf(req); const f = { [col]: req.user.id };
+    C.pageHeaders(res, pg, await appts.count(f));
+    res.json((await appts.all(f, { sort: { date: -1, start: -1 }, skip: pg.skip, limit: pg.limit })).map(apptView));
   }));
   app.get('/appointments/:id', auth(), wrap(async (req, res) => {
     const a = await appts.get({ id: req.params.id });
