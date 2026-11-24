@@ -23,7 +23,7 @@ async function goPay(apptId, minAttempts = 1) {
 }
 
 VIEWS.patient.dashboard = async (el) => {
-  const [stats, appts] = await Promise.all([api('/scheduling/stats/me'), api('/scheduling/appointments/mine')]);
+  const [stats, appts] = await Promise.all([api('/scheduling/stats/me'), api('/scheduling/appointments/mine?limit=100')]);
   const today = ymd(new Date());
   const up = appts.filter((a) => ['pending', 'confirmed', 'in_progress'].includes(a.status) && a.date >= today).sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start)).slice(0, 5);
   const pct = stats.total ? (stats.completed * 100) / stats.total : 0;
@@ -89,7 +89,7 @@ VIEWS.patient.appointments = async (el) => {
     $('#ok', m).onclick = async () => { try { await api(`/scheduling/appointments/${a.id}/cancel`, { method: 'POST' }); m.close(); toast('Đã hủy lịch.'); draw(true); } catch (e) { fail(e); } };
   };
   const draw = async (force) => {
-    const list = await api('/scheduling/appointments/mine');
+    const list = await api('/scheduling/appointments/mine?limit=100');
     const s = JSON.stringify(list); if (s === sig && !force) return; sig = s;
     const rowActs = (a) => {
       const b = [];

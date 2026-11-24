@@ -30,7 +30,7 @@ ${a('M470 88L546 148')}${a('M588 88L588 148')}${a('M588 198L588 282')}${a('M272 
 }
 
 VIEWS.doctor.dashboard = async (el) => {
-  const [me, stats, appts, work] = await Promise.all([api('/identity/me'), api('/scheduling/stats/me'), api('/scheduling/appointments/mine'), api('/scheduling/doctors/me/work-state').catch(() => ({ state: 'OFF_DUTY' }))]);
+  const [me, stats, appts, work] = await Promise.all([api('/identity/me'), api('/scheduling/stats/me'), api('/scheduling/appointments/mine?limit=100'), api('/scheduling/doctors/me/work-state').catch(() => ({ state: 'OFF_DUTY' }))]);
   const d = me.doctor, today = ymd(new Date());
   const todayList = appts.filter((a) => a.date === today && ['confirmed', 'in_progress', 'completed'].includes(a.status)).sort((a, b) => a.start.localeCompare(b.start));
   const pct = stats.total ? (stats.completed * 100) / stats.total : 0;
@@ -100,7 +100,7 @@ VIEWS.doctor.appointments = async (el) => {
     modal(`<h2>Hồ sơ của ${esc(a.patientName)}</h2><p style="color:var(--muted);margin-bottom:10px">Lượt xem này được ghi vào nhật ký truy cập mà bệnh nhân có thể xem.</p>${recs.length ? recs.map((r) => `<div class="sum" style="margin-bottom:10px"><div><span>${dmy(r.date)}</span><b>BS. ${esc(r.doctorName)}</b></div><div><span>Triệu chứng</span><b>${esc(r.symptoms)}</b></div><div><span>Chẩn đoán</span><b>${esc(r.diagnosis)}</b></div></div>`).join('') : '<div class="empty">Bệnh nhân chưa có bệnh án.</div>'}`);
   };
   const draw = async (force) => {
-    const list = await api('/scheduling/appointments/mine'); const s = JSON.stringify(list); if (s === sig && !force) return; sig = s;
+    const list = await api('/scheduling/appointments/mine?limit=100'); const s = JSON.stringify(list); if (s === sig && !force) return; sig = s;
     el.innerHTML = `<h2 class="pagetitle">Lịch hẹn</h2><div class="card">${list.length ? `<div class="scroll"><table class="tbl"><tr><th>Bệnh nhân</th><th>Ngày</th><th>Giờ</th><th>Trạng thái</th><th>Thao tác</th></tr>${list.map((a) => `<tr><td><b>${esc(a.patientName)}</b></td><td>${dmy(a.date)}</td><td>${a.start}</td><td>${badge(a.status)}${a.cancelledBy === 'DOCTOR' ? '<br><small style="color:var(--muted)">Do bác sĩ</small>' : ''}</td><td><div class="act">${['confirmed', 'in_progress'].includes(a.status) ? `<button class="btn sm" data-a="join" data-id="${a.id}">Vào phòng khám</button>` : ''}${a.status === 'in_progress' ? `<button class="btn sm" data-a="finish" data-id="${a.id}">Kết thúc và ghi bệnh án</button>` : ''}${['confirmed', 'in_progress', 'completed'].includes(a.status) ? `<button class="btn sm out" data-a="rec" data-id="${a.id}">Hồ sơ bệnh nhân</button>` : ''}</div></td></tr>`).join('')}</table></div>` : '<div class="empty">Chưa có lịch hẹn nào.</div>'}</div>`;
     $$('[data-a]', el).forEach((b) => (b.onclick = async () => {
       const a = list.find((x) => x.id === b.dataset.id);

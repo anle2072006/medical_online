@@ -78,6 +78,25 @@ function landing() {
   frame(`${navbar('home')}<div class="hero"><div>${illustration()}</div><div><h1>Chào mừng đến với <em>SINA Clinic</em></h1><p class="lead">Đặt lịch, thanh toán, khám qua video và nhận thuốc tại nhà. Tất cả trên một nền tảng, không cần xếp hàng.</p><div class="cta"><a class="btn" href="#/login">Đăng nhập</a><a class="btn out" href="#/register">Đăng ký</a></div>
 <div class="steps" id="how"><div><b>1</b>Chọn bác sĩ và khung giờ</div><div><b>2</b>Thanh toán trực tuyến</div><div><b>3</b>Khám qua video</div><div><b>4</b>Nhận đơn và thuốc</div></div></div></div>`);
 }
+// Buoc xac minh email: nhap OTP 6 so da gui ve hop thu (het han 10 phut), co nut gui lai ma.
+function verifyPage(email, justSent) {
+  frame(`${navbar()}<div class="hero"><div>${illustration()}</div><div><form class="authcard" id="f"><h2>Xác minh email</h2>
+<p class="sub">${justSent ? 'Chúng tôi đã gửi' : 'Tài khoản chưa xác minh. Hãy nhập'} mã OTP 6 số ${justSent ? 'về' : 'gửi về'} <b>${esc(email)}</b>. Mã có hiệu lực 10 phút.</p><div id="e"></div>
+<label class="field"><span>Mã OTP</span><input name="otp" inputmode="numeric" maxlength="6" pattern="\\d{6}" required autocomplete="one-time-code" placeholder="------"></label>
+<button class="btn" style="width:100%">Xác minh và vào hệ thống</button>
+<p class="sub" style="margin:14px 0 0"><a href="#" id="resend">Gửi lại mã OTP</a> · <a href="#/login">Quay lại đăng nhập</a></p></form></div></div>`);
+  $('#f').addEventListener('submit', async (ev) => {
+    ev.preventDefault(); const btn = $('#f .btn'); btn.disabled = true; $('#e').innerHTML = '';
+    try {
+      const r = await api('/identity/verify-email', { method: 'POST', body: { email, otp: new FormData(ev.target).get('otp').trim() } });
+      setSession(r.token, r.user); location.hash = '#/dashboard'; route();
+    } catch (e) { $('#e').innerHTML = `<div class="err">${esc(e.message)}</div>`; btn.disabled = false; }
+  });
+  $('#resend').addEventListener('click', async (ev) => {
+    ev.preventDefault();
+    try { await api('/identity/resend-otp', { method: 'POST', body: { email } }); toast('Đã gửi lại mã OTP về email của bạn.'); } catch (e) { fail(e); }
+  });
+}
 function authPage(mode) {
   let role = 'patient', specs = [];
   const draw = () => {
@@ -91,10 +110,13 @@ ${role === 'doctor' ? `<div class="row2"><label class="field"><span>Chuyên khoa
     $('#f').addEventListener('submit', async (ev) => {
       ev.preventDefault(); const f = Object.fromEntries(new FormData(ev.target)); const btn = $('#f .btn'); btn.disabled = true; $('#e').innerHTML = '';
       try {
-        if (mode === 'register') { await api('/identity/register', { method: 'POST', body: { ...f, role } }); }
+        if (mode === 'register') { await api('/identity/register', { method: 'POST', body: { ...f, role } }); return verifyPage(f.email, true); }
         const r = await api('/identity/login', { method: 'POST', body: { email: f.email, password: f.password } });
         setSession(r.token, r.user); location.hash = '#/dashboard'; route();
-      } catch (e) { $('#e').innerHTML = `<div class="err">${esc(e.message)}</div>`; btn.disabled = false; }
+      } catch (e) {
+        if (e.code === 'EMAIL_NOT_VERIFIED') return verifyPage(f.email, false);
+        $('#e').innerHTML = `<div class="err">${esc(e.message)}</div>`; btn.disabled = false;
+      }
     });
   };
   draw();
