@@ -1,0 +1,34 @@
+name: CI
+on:
+  push: { branches: [main] }
+  pull_request:
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run test:unit
+      - run: node scripts/build-openapi.js && git diff --exit-code docs   # OpenAPI phai khop api-catalog.js
+      - run: npm audit --omit=dev
+  e2e:
+    runs-on: ubuntu-latest
+    needs: unit
+    env:
+      JWT_SECRET: ci-jwt-secret-0123456789abcdef0123456789abcdef
+      INTERNAL_KEY: ci-internal-key-0123456789abcdef0123456789ab
+      WEBHOOK_SECRET: ci-webhook-secret-0123456789abcdef01234567
+      EXPOSE_DEV_OTP: "true"
+      ALLOW_MOCK_ADMIN: "true"
+      VNPAY_REQUIRE_OTP: "false"   # trong Docker khong co endpoint lay OTP, bo buoc OTP khi chay kiem thu
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose up -d --build --wait --wait-timeout 180
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+      - run: npm test
+      - if: failure()
+        run: docker compose logs --tail=200

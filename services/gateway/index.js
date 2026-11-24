@@ -81,4 +81,3 @@ app.get('/docs', (req, res) => res.type('html').send(`<!doctype html><html lang=
 <script>fetch('/docs/openapi/index.json').then((r) => r.json()).then((urls) => SwaggerUIBundle({ urls, dom_id: '#ui', persistAuthorization: true, tryItOutEnabled: true }));</script></body></html>`));
 app.use(C.express.static(path.join(__dirname, '..', '..', 'frontend')));
 C.finish(app, 'gateway', Number(process.env.PORT || 8080));
-

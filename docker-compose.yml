@@ -34,13 +34,17 @@ services:
     ports: ["27030:27017"]  
     healthcheck: { test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"], interval: 10s, timeout: 10s, retries: 12 }
 
-  mock-externals: { <<: *svc, command: ["node", "services/mock-externals/index.js"] }
-  identity:   { <<: *svc, command: ["node", "services/identity/index.js"],   environment: { <<: *env, LICENSE_CHECK_MS: "60000" } }
-  scheduling: { <<: *svc, command: ["node", "services/scheduling/index.js"] }
-  billing:    { <<: *svc, command: ["node", "services/billing/index.js"] }
-  records:    { <<: *svc, command: ["node", "services/records/index.js"] }
-  tele:       { <<: *svc, command: ["node", "services/tele/index.js"] }
-  notify:  
+  mock-externals: { <<: *svc, command: ["node", "services/mock-externals/index.js"], environment: { <<: *env, VNPAY_REQUIRE_OTP: "${VNPAY_REQUIRE_OTP:-true}" }, healthcheck: { test: ["CMD", "node", "-e", "fetch('http://localhost:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"], interval: 10s, timeout: 5s, retries: 12, start_period: 10s } }
+  identity:
+    <<: *svc
+    command: ["node", "services/identity/index.js"]
+    environment: { <<: *env, LICENSE_CHECK_MS: "60000", EXPOSE_DEV_OTP: "${EXPOSE_DEV_OTP:-false}" }   # EXPOSE_DEV_OTP chi bat khi chay kiem thu tu dong
+    healthcheck: { test: ["CMD", "node", "-e", "fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"], interval: 10s, timeout: 5s, retries: 12, start_period: 10s }
+  scheduling: { <<: *svc, command: ["node", "services/scheduling/index.js"], healthcheck: { test: ["CMD", "node", "-e", "fetch('http://localhost:3002/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"], interval: 10s, timeout: 5s, retries: 12, start_period: 10s } }
+  billing:    { <<: *svc, command: ["node", "services/billing/index.js"], healthcheck: { test: ["CMD", "node", "-e", "fetch('http://localhost:3003/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"], interval: 10s, timeout: 5s, retries: 12, start_period: 10s } }
+  records:    { <<: *svc, command: ["node", "services/records/index.js"], healthcheck: { test: ["CMD", "node", "-e", "fetch('http://localhost:3004/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"], interval: 10s, timeout: 5s, retries: 12, start_period: 10s } }
+  tele:       { <<: *svc, command: ["node", "services/tele/index.js"], healthcheck: { test: ["CMD", "node", "-e", "fetch('http://localhost:3005/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"], interval: 10s, timeout: 5s, retries: 12, start_period: 10s } }
+  notify:
     <<: *svc
     command: ["node", "services/notify/index.js"]
     environment:
@@ -51,6 +55,22 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-}
-  gateway:    { <<: *svc, command: ["node", "services/gateway/index.js"], ports: ["8080:8080"] }
+    healthcheck: { test: ["CMD", "node", "-e", "fetch('http://localhost:3006/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"], interval: 10s, timeout: 5s, retries: 12, start_period: 10s }
+  gateway:
+    <<: *svc
+    command: ["node", "services/gateway/index.js"]
+    ports: ["8080:8080"]
+    environment: { <<: *env, ALLOW_MOCK_ADMIN: "${ALLOW_MOCK_ADMIN:-false}" }   # true chi khi demo/kiem thu: cho phep thu hoi giay phep gia lap
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+      mongo: { condition: service_healthy }
+      identity: { condition: service_healthy }
+      scheduling: { condition: service_healthy }
+      billing: { condition: service_healthy }
+      records: { condition: service_healthy }
+      tele: { condition: service_healthy }
+      notify: { condition: service_healthy }
+      mock-externals: { condition: service_healthy }
+    healthcheck: { test: ["CMD", "node", "-e", "fetch('http://localhost:8080/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"], interval: 10s, timeout: 5s, retries: 12, start_period: 10s }
 
 volumes: { mongo-data: {} }
