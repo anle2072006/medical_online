@@ -14,8 +14,23 @@ async function api(path, { method = 'GET', body, token } = {}) {
 }
 function check(name, cond, extra) { if (cond) { pass++; console.log(`  ok   ${name}`); } else { fail++; console.log(`  FAIL ${name}`, extra !== undefined ? JSON.stringify(extra) : ''); } }
 async function until(fn, ms = 15000) { const t = Date.now(); while (Date.now() - t < ms) { const v = await fn(); if (v) return v; await sleep(300); } return null; }
+// Thanh toan VNPay gia lap thanh cong. Neu cong yeu cau OTP: bam gui OTP roi lay ma qua endpoint kiem thu (chi co khi khong chay production);
+// neu chay Docker thi dat VNPAY_REQUIRE_OTP=false cho mock-externals (xem README, muc Kiem thu).
+async function payOk(txn) {
+  const sent = await api(`/ext/vnpay/otp/${txn}`, { method: 'POST' });
+  const o = sent.status === 200 ? await api(`/ext/vnpay/_test/otp/${txn}`) : null;
+  return api(`/ext/vnpay/complete/${txn}?result=ok`, { method: 'POST', body: o && o.body && o.body.otp ? { otp: o.body.otp } : {} });
+}
 const run = Date.now().toString(36);
-const mk = async (role, name, extra = {}) => { await api('/api/identity/register', { method: 'POST', body: { role, email: `${name.replace(/\s+/g, '')}.${run}@test.vn`, password: 'secret123', fullName: name, ...extra } }); const r = await api('/api/identity/login', { method: 'POST', body: { email: `${name.replace(/\s+/g, '')}.${run}@test.vn`, password: 'secret123' } }); return { token: r.body.token, id: r.body.user.id }; };
+// Dang ky + xac minh email bang OTP (can chay he thong voi EXPOSE_DEV_OTP=true de dang ky tra ma OTP cho kiem thu).
+// Dung token tra ve tu verify-email (khong goi login) de tiet kiem luot trong gioi han 20 lan/phut cua gateway.
+const mk = async (role, name, extra = {}) => {
+  const email = `${name.replace(/\s+/g, '')}.${run}@test.vn`;
+  const reg = await api('/api/identity/register', { method: 'POST', body: { role, email, password: 'secret123', fullName: name, ...extra } });
+  if (!reg.body.devOtp) { console.error('Dang ky khong tra devOtp. Hay chay he thong voi EXPOSE_DEV_OTP=true (xem README, muc Kiem thu).'); process.exit(2); }
+  const v = await api('/api/identity/verify-email', { method: 'POST', body: { email, otp: reg.body.devOtp } });
+  return { token: v.body.token, id: v.body.user.id, email };
+};
 
 (async () => {
   const tomorrow = addDays(new Date(), 1); const dayAfter = addDays(new Date(), 2);
@@ -57,7 +72,7 @@ const mk = async (role, name, extra = {}) => { await api('/api/identity/register
   const inv = await until(async () => { const r = await api(`/api/billing/invoices?appointmentId=${a1.body.id}`, { token: p1.token }); return r.body[0] && r.body[0].payUrl ? r.body[0] : null; });
   check('billing tao hoa don + duong dan VNPay qua su kien', !!inv && inv.amount === 200000, inv);
   const txn = inv.payUrl.split('/').pop();
-  await api(`/ext/vnpay/complete/${txn}?result=ok`, { method: 'POST' });
+  await payOk(txn);
   check('thanh toan xong -> confirmed', await until(async () => (await api(`/api/scheduling/appointments/${a1.body.id}`, { token: p1.token })).body.status === 'confirmed'));
   const full = (await api(`/api/scheduling/appointments/${a1.body.id}`, { token: p1.token })).body;
   check('nhat ky FSM: pending -> confirmed', full.log.map((l) => l.to_status).join('>') === 'pending>confirmed', full.log);
@@ -70,7 +85,7 @@ const mk = async (role, name, extra = {}) => { await api('/api/identity/register
   check('thu lai thanh toan -> pending', (await api(`/api/scheduling/appointments/${a2.id}/retry-payment`, { method: 'POST', token: p2.token })).status === 200);
   const inv2b = await until(async () => { const r = await api(`/api/billing/invoices?appointmentId=${a2.id}`, { token: p2.token }); return r.body[0] && r.body[0].payUrl && r.body[0].attempts === 2 ? r.body[0] : null; });
   check('billing tao lan thanh toan thu 2', !!inv2b);
-  await api(`/ext/vnpay/complete/${inv2b.payUrl.split('/').pop()}?result=ok`, { method: 'POST' });
+  await payOk(inv2b.payUrl.split('/').pop());
   check('thu lai thanh cong -> confirmed', await until(async () => (await api(`/api/scheduling/appointments/${a2.id}`, { token: p2.token })).body.status === 'confirmed'));
 
   console.log('5. Kham tu xa, benh an, don thuoc dien tu');
@@ -102,7 +117,7 @@ const mk = async (role, name, extra = {}) => { await api('/api/identity/register
   console.log('6. Huy lich, hoan tien (Saga), doi lich');
   const a3 = (await api('/api/scheduling/appointments', { method: 'POST', token: p3.token, body: { slotId: slotC.id } })).body;
   const inv3 = await until(async () => { const r = await api(`/api/billing/invoices?appointmentId=${a3.id}`, { token: p3.token }); return r.body[0] && r.body[0].payUrl ? r.body[0] : null; });
-  await api(`/ext/vnpay/complete/${inv3.payUrl.split('/').pop()}?result=ok`, { method: 'POST' });
+  await payOk(inv3.payUrl.split('/').pop());
   await until(async () => (await api(`/api/scheduling/appointments/${a3.id}`, { token: p3.token })).body.status === 'confirmed');
   const rs = await api(`/api/scheduling/appointments/${a3.id}/reschedule`, { method: 'POST', token: p3.token, body: { slotId: slotD.id } });
   check('doi lich sang slot moi', rs.status === 200 && rs.body.start === slotD.start && rs.body.status === 'confirmed', rs.body);
@@ -119,7 +134,7 @@ const mk = async (role, name, extra = {}) => { await api('/api/identity/register
   console.log('7. Bac si nghi phep -> huy hang loat + hoan tien');
   const a4 = (await api('/api/scheduling/appointments', { method: 'POST', token: p3.token, body: { slotId: slotE.id } })).body;
   const inv4 = await until(async () => { const r = await api(`/api/billing/invoices?appointmentId=${a4.id}`, { token: p3.token }); return r.body[0] && r.body[0].payUrl ? r.body[0] : null; });
-  await api(`/ext/vnpay/complete/${inv4.payUrl.split('/').pop()}?result=ok`, { method: 'POST' });
+  await payOk(inv4.payUrl.split('/').pop());
   await until(async () => (await api(`/api/scheduling/appointments/${a4.id}`, { token: p3.token })).body.status === 'confirmed');
   const leave = await api('/api/scheduling/leaves', { method: 'POST', token: docA.token, body: { fromDate: slotE.date, toDate: slotE.date } });
   check('nghi phep duoc tu duyet', leave.status === 201, leave.body);
@@ -141,6 +156,33 @@ const mk = async (role, name, extra = {}) => { await api('/api/identity/register
   check('khong token -> 401', (await api('/api/scheduling/doctors')).status === 401);
   check('benh nhan khong dang ky ca duoc -> 403', (await api('/api/scheduling/shifts', { method: 'POST', token: p1.token, body: shift })).status === 403);
   check('webhook/internal khong lo ra ngoai gateway', (await api('/api/billing/webhooks/vnpay-ipn', { method: 'POST', body: {} })).status === 404);
+
+  console.log('11. Xac minh email (OTP) va gioi han du lieu nhap');
+  const em = `otp.${run}@test.vn`; const reg = { role: 'patient', email: em, password: 'secret123', fullName: 'Nguoi Moi' };
+  const r0 = await api('/api/identity/register', { method: 'POST', body: reg });
+  check('dang ky tra ve verificationRequired', r0.status === 201 && r0.body.verificationRequired === true && !!r0.body.devOtp, r0.body);
+  const lg = await api('/api/identity/login', { method: 'POST', body: { email: em, password: 'secret123' } });
+  check('chua xac minh email -> khong dang nhap duoc (403 EMAIL_NOT_VERIFIED)', lg.status === 403 && lg.body.error === 'EMAIL_NOT_VERIFIED', lg.body);
+  const bad = await api('/api/identity/verify-email', { method: 'POST', body: { email: em, otp: r0.body.devOtp === '000000' ? '111111' : '000000' } });
+  check('OTP sai -> BAD_OTP', bad.status === 400 && bad.body.error === 'BAD_OTP', bad.body);
+  const ok = await api('/api/identity/verify-email', { method: 'POST', body: { email: em, otp: r0.body.devOtp } });
+  check('OTP dung -> kich hoat va tra token', ok.status === 200 && !!ok.body.token, ok.body);
+  check('xac minh xong dang nhap duoc ngay', (await api('/api/identity/me', { token: ok.body.token })).status === 200);
+  check('dung lai OTP da dung bi tu choi', (await api('/api/identity/verify-email', { method: 'POST', body: { email: em, otp: r0.body.devOtp } })).status === 400);
+  check('ten 200 ky tu -> INVALID_FIELD', (await api('/api/identity/register', { method: 'POST', body: { ...reg, email: `a.${run}@test.vn`, fullName: 'x'.repeat(200) } })).body.error === 'INVALID_FIELD');
+  check('email a@b@c.d -> INVALID_EMAIL', (await api('/api/identity/register', { method: 'POST', body: { ...reg, email: 'a@b@c.d' } })).body.error === 'INVALID_EMAIL');
+  const big = await api('/api/identity/register', { method: 'POST', body: { ...reg, fullName: 'x'.repeat(200 * 1024) } });
+  check('body 200KB -> 413 PAYLOAD_TOO_LARGE', big.status === 413 && big.body.error === 'PAYLOAD_TOO_LARGE', big.body);
+  check('NoSQL injection o login bi chan', (await api('/api/identity/login', { method: 'POST', body: { email: { $gt: '' }, password: 'x' } })).status === 400);
+  check('benh an: trieu chung qua dai -> INVALID_FIELD', (await api(`/api/records/consultations/${a1.body.id}/complete`, { method: 'POST', token: docA.token, body: { symptoms: 'x'.repeat(5000), diagnosis: 'y' } })).status === 400);
+  let limited = 0; for (let i = 0; i < 30 && !limited; i++) { const r = await api('/api/identity/login', { method: 'POST', body: { email: `no.${run}@test.vn`, password: 'wrong-pass' } }); if (r.status === 429) limited = i + 1; }
+  check('dang nhap sai lien tuc bi gioi han 429 (toi da 20 lan/phut/IP)', limited > 0 && limited <= 21, limited);
+  check('429 khong anh huong API khac (gateway van tra loi)', (await api('/api/health')).status === 200);
+
+  console.log('12. Phan trang');
+  const pgR = await fetch(`${BASE}/api/scheduling/appointments/mine?limit=1&page=1`, { headers: { authorization: `Bearer ${p3.token}` } });
+  const pgBody = await pgR.json();
+  check('phan trang: limit=1 chi tra 1 muc, kem X-Total-Count', pgR.status === 200 && pgBody.length === 1 && Number(pgR.headers.get('x-total-count')) >= 2, pgBody.length);
 
   console.log(`\nKet qua: ${pass} dat, ${fail} loi`);
   process.exit(fail ? 1 : 0);
